@@ -1,0 +1,48 @@
+studio_id,studio_name,official_region,network_market,state,market_tier,local_ridership_cluster,rides_per_wk_a,bikes_per_ride_a,rides_per_wk_b,bikes_per_ride_b,slots_per_wk
+19TH,19th Street,NYC,Greater NYC,NY,Mega,Midtown Manhattan,41,61,0,0,2501
+BKHT,Brooklyn Heights,NYC,Greater NYC,NY,Mega,Lower Manhattan–North Brooklyn,35,66,0,0,2310
+E54,East 54th Street,NYC,Greater NYC,NY,Mega,Midtown Manhattan,30,58,0,0,1740
+E63,East 63rd Street,NYC,Greater NYC,NY,Mega,Uptown Manhattan,24,64,0,0,1536
+E83,East 83rd Street,NYC,Greater NYC,NY,Mega,Uptown Manhattan,48,70,29,46,4694
+FIDI,Financial District,NYC,Greater NYC,NY,Mega,Lower Manhattan–North Brooklyn,25,58,0,0,1450
+HDYD,Hudson Yards,NYC,Greater NYC,NY,Mega,Midtown Manhattan,21,55,0,0,1155
+NOHO,NoHo,NYC,Greater NYC,NY,Mega,Lower Manhattan–North Brooklyn,71,60,0,0,4260
+NOMD,NoMad,NYC,Greater NYC,NY,Mega,Midtown Manhattan,37,65,0,0,2405
+TRI,TriBeCa,NYC,Greater NYC,NY,Mega,Lower Manhattan–North Brooklyn,31,62,4,15,1982
+W77,West 77th Street,NYC,Greater NYC,NY,Mega,Uptown Manhattan,47,61,0,0,2867
+WVLG,West Village,NYC,Greater NYC,NY,Mega,Lower Manhattan–North Brooklyn,33,61,0,0,2013
+BURG,Williamsburg,NYC,Greater NYC,NY,Mega,Lower Manhattan–North Brooklyn,31,62,0,0,1922
+HBKN,Hoboken,New Jersey,Greater NYC,NJ,Mega,Hudson County,24,60,0,0,1440
+SH,Short Hills,New Jersey,Greater NYC,NJ,Mega,North Jersey,26,50,0,0,1300
+RZLN,Roslyn,Long Island,Greater NYC,NY,Mega,Nassau County,32,52,0,0,1664
+BXVL,Bronxville,Westchester,Greater NYC,NY,Mega,Westchester,32,56,0,0,1792
+RYBK,Rye Brook,Westchester,Greater NYC,NY,Mega,Westchester,23,47,0,0,1081
+GWCH,Greenwich,Connecticut,Greater NYC,CT,Mega,Fairfield County,30,60,0,0,1800
+WSPT,Westport,Connecticut,Greater NYC,CT,Mega,Fairfield County,26,56,0,0,1456
+14TH,14TH,DC,DMV,DC,Large,DC–Arlington,44,58,0,0,2552
+GTWN,Georgetown,DC,DMV,DC,Large,DC–Arlington,36,59,0,0,2124
+CLDN,Clarendon,Virginia,DMV,VA,Large,DC–Arlington,35,55,0,0,1925
+BSDA,Bethesda,Maryland,DMV,MD,Large,Montgomery County,32,55,0,0,1760
+BTWD,Brentwood,Southern California,Southern California,CA,Large,Los Angeles,42,50,0,0,2100
+PDNA,Pasadena,Southern California,Southern California,CA,Large,Pasadena,35,51,0,0,1785
+SAMO,Santa Monica,Southern California,Southern California,CA,Large,Los Angeles,30,40,0,0,1200
+WEHO,West Hollywood,Southern California,Southern California,CA,Large,Los Angeles,38,56,0,0,2128
+PALO,Palo Alto,Bay Area,Northern California,CA,Large,Silicon Valley,34,52,0,0,1768
+CSTR,Castro,San Francisco,Northern California,CA,Large,San Francisco,44,50,0,0,2200
+MRIN,Marin,San Francisco,Northern California,CA,Large,Marin County,17,58,0,0,986
+UNST,Union Street,San Francisco,Northern California,CA,Large,San Francisco,37,55,0,0,2035
+BKBY,Back Bay,Massachusetts,Boston,MA,Medium,Boston,42,56,0,0,2352
+CNHL,Chestnut Hill,Massachusetts,Boston,MA,Medium,Chestnut Hill,42,55,0,0,2310
+PORT,Seaport,Massachusetts,Boston,MA,Medium,Boston,22,57,0,0,1254
+BRKL,Brickell,Miami,South Florida,FL,Medium,Miami,25,54,0,0,1350
+COGA,Coral Gables,Miami,South Florida,FL,Medium,Miami,32,52,0,0,1664
+OLTN,Old Town,Chicago,Chicago,IL,Medium,Chicago,43,53,0,0,2279
+LOOP,The Loop,Chicago,Chicago,IL,Medium,Chicago,28,67,0,0,1876
+ADMR,Ardmore,Pennsylvania,Philadelphia,PA,Medium,Main Line,38,56,0,0,2128
+RHSQ,Rittenhouse Square,Pennsylvania,Philadelphia,PA,Medium,Philadelphia,38,56,0,0,2128
+DATX,Downtown Austin,Texas,Austin,TX,Concentrated,Austin,31,54,0,0,1674
+ROTX,River Oaks,Texas,Houston,TX,Concentrated,Houston,28,56,0,0,1568
+UPTN,Uptown,Texas,Dallas,TX,Concentrated,Dallas,34,55,0,0,1870
+ANBR,Ann Arbor,Ann Arbor,Ann Arbor,MI,Concentrated,Ann Arbor,25,47,0,0,1175
+BKHD,Buckhead,Atlanta,Atlanta,GA,Concentrated,Atlanta,30,56,0,0,1680
+SLUN,South Lake Union,Seattle,Seattle,WA,Concentrated,Seattle,33,63,0,0,2079
