@@ -56,3 +56,33 @@ def test_studio_slot_assignments_match_studio_allocations(studios_csv_path, acti
             sid = lookup[slot_id].studio_id
             studio_counts[sid] = studio_counts.get(sid, 0) + 1
         assert studio_counts == instructor.baseline_studio_allocations
+
+def test_baseline_slots_have_no_time_conflicts(studios_csv_path, active_instructors_csv_path, instructor_sample_csv_path, rng, fake):
+    studios = load_studios(studios_csv_path)
+    create_all_weekly_schedules(studios, rng)
+    class_slots = create_network_class_slots(studios)
+    instructors = generate_instructors(active_instructors_csv_path, instructor_sample_csv_path, studios_csv_path, rng, fake)
+    lookup = {slot.slot_id: slot for slot in class_slots}
+
+    assign_baseline_slots(instructors, class_slots, rng)
+
+    for instructor in instructors.values():
+        seen_times: set[tuple[str, int]] = set()
+        for slot_id in instructor.baseline_slot_ids:
+            slot = lookup[slot_id]
+            time_key = (slot.day_of_week, slot.daily_slot_index)
+            assert time_key not in seen_times
+            seen_times.add(time_key)
+
+def test_assign_baseline_slots_succeeds_across_seeds(studios_csv_path, active_instructors_csv_path, instructor_sample_csv_path, fake):
+    import numpy as np
+
+    for seed in [6400, 6401, 6402, 6403, 6404, 7000, 8000, 9000, 10000, 12345]:
+        rng = np.random.default_rng(seed)
+        studios = load_studios(studios_csv_path)
+        create_all_weekly_schedules(studios, rng)
+        class_slots = create_network_class_slots(studios)
+        instructors = generate_instructors(active_instructors_csv_path, instructor_sample_csv_path, studios_csv_path, rng, fake)
+
+        assign_baseline_slots(instructors, class_slots, rng)
+        validate_baseline(instructors, class_slots)
