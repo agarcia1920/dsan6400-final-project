@@ -10,6 +10,8 @@ This project simulates repeated rider co-attendance across a synthetic SoulCycle
 - Synthetic instructor population generation
 - Market-tier behavioral parameter estimation
 - Studio capacity vs instructor-demand diagnostics
+- Baseline instructor-to-slot assignment
+- Weekly class schedule realization (off weeks and substitutions)
 
 ## Data
 
@@ -33,6 +35,7 @@ pytest
 ```text
 src/soulcycle_network/
 ├── baseline_class_slot.py
+├── baseline_instructor_schedule.py
 ├── class_slot_builder.py
 ├── config.py
 ├── instructor.py
@@ -41,11 +44,13 @@ src/soulcycle_network/
 ├── instructor_parameters.py
 ├── studio.py
 ├── studio_loader.py
-└── studio_schedule.py
+├── studio_schedule.py
+├── weekly_class_session.py
+└── weekly_schedule.py
 ```
 
 ## Modeling notes
 
 - Home-cluster allocation uses weekly bike supply (`rides_per_week * bikes_per_ride`) rather than slot counts.
 - `CLASS_LOAD_STUDIO_EFFECT` in `config.py` is a fixed modeling assumption linking baseline class load to regular studio count.
-- Instructor baseline studio allocations are not yet constrained to fit each studio's available recurring class slots. Use `summarize_studio_capacity_vs_demand()` before building the weekly assignment layer.
+- Instructor baseline loads are calibrated to total recurring class supply (1,615 slots) and studio allocations respect per-studio capacity.

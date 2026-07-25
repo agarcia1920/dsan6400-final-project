@@ -1,6 +1,4 @@
 # Studio objects for the SoulCycle network simulation.
-# A studio is a persistent location in the network.
-# Weekly class sessions and instructor assignments are handled elsewhere.
 
 from dataclasses import dataclass, field
 

@@ -1,5 +1,4 @@
-# Baseline class-slot objects for the SoulCycle network simulation.
-# These are persistent recurring slots for each studio, not realized weekly sessions.
+# Persistent recurring class slots for each studio.
 
 from dataclasses import dataclass
 from soulcycle_network.config import DAYS_OF_WEEK

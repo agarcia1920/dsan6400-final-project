@@ -1,5 +1,4 @@
-# Functions for creating persistent baseline class slots.
-# Each studio's daily room schedules become individual recurring class-slot objects.
+# Build recurring class slots from studio daily schedules.
 
 from soulcycle_network.baseline_class_slot import BaselineClassSlot
 from soulcycle_network.config import DAYS_OF_WEEK

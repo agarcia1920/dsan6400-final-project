@@ -1,6 +1,4 @@
 # Instructor objects for the SoulCycle network simulation.
-# An instructor is a persistent node in the network with a home market and regular teaching pattern.
-# Weekly availability, substitutions, and slot assignments are handled elsewhere.
 
 from dataclasses import dataclass, field
 

@@ -1,92 +1,95 @@
-# Orchestration for generating the synthetic instructor population.
+# Generate the synthetic instructor population.
 
 from pathlib import Path
 import numpy as np
 import pandas as pd
 from faker import Faker
 from soulcycle_network.instructor import Instructor
-from soulcycle_network.instructor_assignment import allocate_classes_across_studios, allocate_home_clusters, choose_regular_studios
-from soulcycle_network.instructor_parameters import MARKET_TO_TIER, draw_baseline_class_count, draw_regular_studio_count, load_generator_inputs
+from soulcycle_network.instructor_assignment import allocate_classes, allocate_clusters, calibrate_class_loads, init_capacity, market_class_supply, pick_studios
+from soulcycle_network.instructor_parameters import MARKET_TO_TIER, draw_class_count, draw_studio_count, load_inputs
 
-def generate_names(num_names: int, fake: Faker) -> list[str]:
-    if isinstance(num_names, bool) or not isinstance(num_names, int):
-        raise TypeError("num_names must be an integer.")
-    if num_names <= 0:
-        raise ValueError("num_names must be positive.")
+def generate_names(n: int, fake: Faker) -> list[str]:
+    if isinstance(n, bool) or not isinstance(n, int):
+        raise TypeError("n must be an integer.")
     if not isinstance(fake, Faker):
         raise TypeError("fake must be a Faker object.")
 
     names: list[str] = []
-    seen_names: set[str] = set()
+    seen: set[str] = set()
 
-    while len(names) < num_names:
-        candidate_name = fake.name().strip()
-        if candidate_name and candidate_name not in seen_names:
-            names.append(candidate_name)
-            seen_names.add(candidate_name)
+    while len(names) < n:
+        candidate = fake.name().strip()
+        if candidate and candidate not in seen:
+            names.append(candidate)
+            seen.add(candidate)
 
     return names
 
-def generate_instructors(active_instructor_path: str | Path, instructor_sample_path: str | Path, studio_path: str | Path, rng: np.random.Generator, fake: Faker) -> dict[str, Instructor]:
+def generate_instructors(active_path: str | Path, sample_path: str | Path, studio_path: str | Path, rng: np.random.Generator, fake: Faker) -> dict[str, Instructor]:
     if not isinstance(rng, np.random.Generator):
         raise TypeError("rng must be a NumPy Generator.")
     if not isinstance(fake, Faker):
         raise TypeError("fake must be a Faker object.")
 
-    active_data, sample_data, studio_data, market_counts, tier_parameters = load_generator_inputs(active_instructor_path=active_instructor_path, instructor_sample_path=instructor_sample_path, studio_path=studio_path)
+    active_data, sample_data, studio_data, market_counts, tier_params = load_inputs(active_path, sample_path, studio_path)
 
-    total_instructors = int(sum(market_counts.values()))
-    fictitious_names = generate_names(num_names=total_instructors, fake=fake)
-    name_iterator = iter(fictitious_names)
+    total = int(sum(market_counts.values()))
+    names = generate_names(total, fake)
+    name_iter = iter(names)
     instructors: dict[str, Instructor] = {}
-    instructor_number = 1
+    n = 1
+    cap_left = init_capacity(studio_data)
 
     for market in sorted(market_counts):
-        market_instructor_count = int(market_counts[market])
-        if market not in MARKET_TO_TIER:
-            raise ValueError("No market tier mapping found for '" + market + "'.")
+        n_market = int(market_counts[market])
+        tier = MARKET_TO_TIER[market]
+        cluster_alloc = allocate_clusters(market, n_market, studio_data)
 
-        market_tier = MARKET_TO_TIER[market]
-        cluster_allocations = allocate_home_clusters(market=market, instructor_count=market_instructor_count, studio_data=studio_data)
+        clusters: list[str] = []
+        for cluster, count in cluster_alloc.items():
+            clusters.extend([cluster] * count)
+        rng.shuffle(clusters)
 
-        home_clusters: list[str] = []
-        for home_cluster, cluster_count in cluster_allocations.items():
-            home_clusters.extend([home_cluster] * cluster_count)
-        rng.shuffle(home_clusters)
+        roster: list[dict[str, str]] = []
+        for cluster in clusters:
+            roster.append({
+                "instructor_id": "I" + str(n).zfill(4),
+                "instructor_name": next(name_iter),
+                "home_cluster": cluster,
+            })
+            n += 1
 
-        for home_cluster in home_clusters:
-            instructor_id = "I" + str(instructor_number).zfill(4)
-            instructor_name = next(name_iterator)
-            baseline_class_count = draw_baseline_class_count(market_tier=market_tier, tier_parameters=tier_parameters, rng=rng)
-            regular_studio_count = draw_regular_studio_count(market_tier=market_tier, baseline_class_count=baseline_class_count, tier_parameters=tier_parameters, rng=rng)
-            regular_studio_count = min(regular_studio_count, baseline_class_count)
-            regular_studio_ids = choose_regular_studios(market=market, home_cluster=home_cluster, requested_studio_count=regular_studio_count, studio_data=studio_data, rng=rng)
-            studio_allocations = allocate_classes_across_studios(baseline_class_count=baseline_class_count, regular_studio_ids=regular_studio_ids, studio_data=studio_data, rng=rng)
+        raw_counts = pd.Series({entry["instructor_id"]: draw_class_count(tier, tier_params, rng) for entry in roster})
+        target = market_class_supply(market, studio_data)
+        class_counts = calibrate_class_loads(raw_counts, target)
+        rng.shuffle(roster)
 
-            instructor = Instructor(
-                instructor_id=instructor_id,
-                instructor_name=instructor_name,
+        for entry in roster:
+            iid = entry["instructor_id"]
+            n_classes = int(class_counts[iid])
+            n_studios = draw_studio_count(tier, n_classes, tier_params, rng)
+            n_studios = min(n_studios, n_classes)
+            studio_ids = pick_studios(market, entry["home_cluster"], n_studios, studio_data, rng, cap_left)
+            alloc = allocate_classes(n_classes, studio_ids, studio_data, rng, market, cap_left)
+
+            instructors[iid] = Instructor(
+                instructor_id=iid,
+                instructor_name=entry["instructor_name"],
                 network_market=market,
-                market_tier=market_tier,
-                home_cluster=home_cluster,
-                baseline_class_count=baseline_class_count,
-                regular_studio_assignments=regular_studio_ids,
-                baseline_studio_allocations=studio_allocations,
+                market_tier=tier,
+                home_cluster=entry["home_cluster"],
+                baseline_class_count=n_classes,
+                regular_studio_assignments=list(alloc.keys()),
+                baseline_studio_allocations=alloc,
                 baseline_day_counts={},
                 baseline_slot_ids=[],
             )
 
-            if instructor_id in instructors:
-                raise RuntimeError("Duplicate instructor ID generated: " + instructor_id)
+    if len(instructors) != total:
+        raise RuntimeError("Generated " + str(len(instructors)) + " instructors, but expected " + str(total) + ".")
 
-            instructors[instructor_id] = instructor
-            instructor_number += 1
-
-    if len(instructors) != total_instructors:
-        raise RuntimeError("Generated " + str(len(instructors)) + " instructors, but expected " + str(total_instructors) + ".")
-
-    generated_market_counts = pd.Series([instructor.network_market for instructor in instructors.values()]).value_counts().to_dict()
-    if generated_market_counts != market_counts:
+    got = pd.Series([i.network_market for i in instructors.values()]).value_counts().to_dict()
+    if got != market_counts:
         raise RuntimeError("Generated instructor market counts do not match the active instructor population.")
 
     return instructors
@@ -97,13 +100,13 @@ def instructors_to_dataframe(instructors: dict[str, Instructor]) -> pd.DataFrame
 
     rows: list[dict[str, object]] = []
 
-    for instructor_id, instructor in instructors.items():
+    for instructor in instructors.values():
         if not isinstance(instructor, Instructor):
-            raise TypeError("Value stored under " + instructor_id + " must be an Instructor object.")
+            raise TypeError("instructors must contain Instructor objects.")
 
-        allocation_parts = []
-        for studio_id, class_count in instructor.baseline_studio_allocations.items():
-            allocation_parts.append(studio_id + ":" + str(class_count))
+        parts = []
+        for sid, n in instructor.baseline_studio_allocations.items():
+            parts.append(sid + ":" + str(n))
 
         rows.append({
             "instructor_id": instructor.instructor_id,
@@ -114,14 +117,13 @@ def instructors_to_dataframe(instructors: dict[str, Instructor]) -> pd.DataFrame
             "baseline_class_count": instructor.baseline_class_count,
             "regular_studio_count": len(instructor.regular_studio_assignments),
             "regular_studio_ids": "; ".join(instructor.regular_studio_assignments),
-            "baseline_studio_allocations": "; ".join(allocation_parts),
+            "baseline_studio_allocations": "; ".join(parts),
         })
 
-    instructor_data = pd.DataFrame(rows)
-    if not instructor_data.empty:
-        instructor_data = instructor_data.sort_values(by="instructor_id").reset_index(drop=True)
-
-    return instructor_data
+    df = pd.DataFrame(rows)
+    if not df.empty:
+        df = df.sort_values(by="instructor_id").reset_index(drop=True)
+    return df
 
 def save_instructors(instructors: dict[str, Instructor], output_path: str | Path) -> None:
     output_path = Path(output_path)
@@ -129,5 +131,4 @@ def save_instructors(instructors: dict[str, Instructor], output_path: str | Path
         raise ValueError("Instructor output file must be a CSV.")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    instructor_data = instructors_to_dataframe(instructors)
-    instructor_data.to_csv(output_path, index=False)
+    instructors_to_dataframe(instructors).to_csv(output_path, index=False)

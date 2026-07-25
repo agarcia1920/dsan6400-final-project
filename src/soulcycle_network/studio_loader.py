@@ -1,5 +1,4 @@
-# Loads studio data from a CSV file.
-# The studios.csv file has one row per studio in the SoulCycle network.
+# Load studios from CSV.
 
 from pathlib import Path
 from soulcycle_network.studio import Studio

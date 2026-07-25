@@ -1,6 +1,4 @@
-# Functions for creating persistent studio class schedules.
-# Each room's weekly class count is divided across the seven days of the week.
-# We are not assigning times yet, just how many classes happen on each day.
+# Divide each room's weekly class count across the seven days.
 
 import numpy as np
 from soulcycle_network.config import DAYS_OF_WEEK

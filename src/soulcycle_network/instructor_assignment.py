@@ -1,169 +1,205 @@
-# Assignment helpers for placing synthetic instructors in clusters and studios.
+# Place instructors in clusters and studios.
 
 import numpy as np
 import pandas as pd
 from soulcycle_network.instructor import Instructor
 from soulcycle_network.studio import Studio
 
-def largest_remainder_allocation(total: int, weights: pd.Series) -> dict[str, int]:
+def split_by_weights(total: int, weights: pd.Series) -> dict[str, int]:
     if isinstance(total, bool) or not isinstance(total, int):
         raise TypeError("total must be an integer.")
-    if total < 0:
-        raise ValueError("total cannot be negative.")
     if not isinstance(weights, pd.Series):
         raise TypeError("weights must be a pandas Series.")
-    if weights.empty:
-        raise ValueError("weights cannot be empty.")
 
     numeric_weights = pd.to_numeric(weights, errors="raise").astype(float)
-    if numeric_weights.isna().any():
-        raise ValueError("weights cannot contain missing values.")
-    if (numeric_weights < 0).any():
-        raise ValueError("weights cannot contain negative values.")
     if numeric_weights.sum() <= 0:
         raise ValueError("weights must sum to a positive value.")
 
-    exact_allocations = (numeric_weights / numeric_weights.sum()) * total
-    integer_allocations = np.floor(exact_allocations).astype(int)
-    remaining = total - int(integer_allocations.sum())
-    remainders = (exact_allocations - integer_allocations).sort_values(ascending=False)
+    exact = (numeric_weights / numeric_weights.sum()) * total
+    ints = np.floor(exact).astype(int)
+    left = total - int(ints.sum())
+    remainders = (exact - ints).sort_values(ascending=False)
 
-    for category in remainders.index[:remaining]:
-        integer_allocations.loc[category] += 1
+    for key in remainders.index[:left]:
+        ints.loc[key] += 1
 
-    if int(integer_allocations.sum()) != total:
-        raise RuntimeError("Largest-remainder allocation did not preserve the total.")
+    return ints.to_dict()
 
-    return integer_allocations.to_dict()
-
-def allocate_home_clusters(market: str, instructor_count: int, studio_data: pd.DataFrame) -> dict[str, int]:
-    #cluster weights use weekly bike supply, not slot counts
+def market_class_supply(market: str, studio_data: pd.DataFrame) -> int:
     if not isinstance(market, str):
         raise TypeError("market must be a string.")
-    if isinstance(instructor_count, bool) or not isinstance(instructor_count, int):
-        raise TypeError("instructor_count must be an integer.")
-    if instructor_count <= 0:
-        raise ValueError("instructor_count must be positive.")
     if not isinstance(studio_data, pd.DataFrame):
         raise TypeError("studio_data must be a pandas DataFrame.")
 
-    market = market.strip()
-    market_studios = studio_data.loc[studio_data["network_market"] == market].copy()
-    if market_studios.empty:
+    rows = studio_data.loc[studio_data["network_market"] == market.strip()]
+    if rows.empty:
+        raise ValueError("No studios found for market '" + market + "'.")
+    return int(rows["weekly_class_count"].sum())
+
+def calibrate_class_loads(raw_counts: pd.Series, target_total: int) -> pd.Series:
+    #every instructor keeps at least one baseline class; the rest follow raw load shape
+    if not isinstance(raw_counts, pd.Series):
+        raise TypeError("raw_counts must be a pandas Series.")
+    if isinstance(target_total, bool) or not isinstance(target_total, int):
+        raise TypeError("target_total must be an integer.")
+
+    counts = pd.to_numeric(raw_counts, errors="raise").astype(float)
+    n = len(counts)
+    if target_total < n:
+        raise ValueError("target_total is too small to give every instructor at least one baseline class.")
+
+    left = target_total - n
+    w = (counts - 1).clip(lower=0)
+    if w.sum() == 0:
+        w = pd.Series(1.0, index=counts.index)
+
+    extra = split_by_weights(left, w)
+    out = pd.Series({iid: 1 + extra[iid] for iid in counts.index}, dtype=int)
+
+    if int(out.sum()) != target_total:
+        raise RuntimeError("Calibrated class counts do not match target_total.")
+    return out
+
+def allocate_clusters(market: str, n_instructors: int, studio_data: pd.DataFrame) -> dict[str, int]:
+    #cluster weights use weekly bike supply, not slot counts
+    if not isinstance(market, str):
+        raise TypeError("market must be a string.")
+    if isinstance(n_instructors, bool) or not isinstance(n_instructors, int):
+        raise TypeError("n_instructors must be an integer.")
+    if not isinstance(studio_data, pd.DataFrame):
+        raise TypeError("studio_data must be a pandas DataFrame.")
+
+    rows = studio_data.loc[studio_data["network_market"] == market.strip()].copy()
+    if rows.empty:
         raise ValueError("No studios found for market '" + market + "'.")
 
-    cluster_weights = market_studios.groupby("local_ridership_cluster")["weekly_bike_supply"].sum().sort_index()
-    return largest_remainder_allocation(total=instructor_count, weights=cluster_weights)
+    w = rows.groupby("local_ridership_cluster")["weekly_bike_supply"].sum().sort_index()
+    return split_by_weights(n_instructors, w)
 
-def choose_regular_studios(market: str, home_cluster: str, requested_studio_count: int, studio_data: pd.DataFrame, rng: np.random.Generator) -> list[str]:
+def pick_studios(market: str, home_cluster: str, n_studios: int, studio_data: pd.DataFrame, rng: np.random.Generator, cap_left: dict[str, int]) -> list[str]:
     if not isinstance(market, str):
         raise TypeError("market must be a string.")
     if not isinstance(home_cluster, str):
         raise TypeError("home_cluster must be a string.")
-    if isinstance(requested_studio_count, bool) or not isinstance(requested_studio_count, int):
-        raise TypeError("requested_studio_count must be an integer.")
-    if requested_studio_count <= 0:
-        raise ValueError("requested_studio_count must be positive.")
+    if isinstance(n_studios, bool) or not isinstance(n_studios, int):
+        raise TypeError("n_studios must be an integer.")
     if not isinstance(studio_data, pd.DataFrame):
         raise TypeError("studio_data must be a pandas DataFrame.")
     if not isinstance(rng, np.random.Generator):
         raise TypeError("rng must be a NumPy Generator.")
+    if not isinstance(cap_left, dict):
+        raise TypeError("cap_left must be a dictionary.")
 
     market = market.strip()
     home_cluster = home_cluster.strip()
-    market_studios = studio_data.loc[studio_data["network_market"] == market].copy()
-    if market_studios.empty:
-        raise ValueError("No studios found for market '" + market + "'.")
+    rows = studio_data.loc[studio_data["network_market"] == market].copy()
+    rows = rows.loc[rows["studio_id"].apply(lambda sid: cap_left.get(str(sid), 0) > 0)].copy()
 
-    requested_studio_count = min(requested_studio_count, len(market_studios))
-    home_cluster_studios = market_studios.loc[market_studios["local_ridership_cluster"] == home_cluster].copy()
-    if home_cluster_studios.empty:
-        raise ValueError("No studios found in cluster '" + home_cluster + "' for market '" + market + "'.")
+    if rows.empty:
+        raise ValueError("No studios with remaining capacity found for market '" + market + "'.")
 
-    home_probabilities = home_cluster_studios["weekly_bike_supply"] / home_cluster_studios["weekly_bike_supply"].sum()
-    selected_home_index = rng.choice(home_cluster_studios.index.to_numpy(), p=home_probabilities.to_numpy())
-    selected_studio_ids = [str(home_cluster_studios.loc[selected_home_index, "studio_id"])]
+    n_studios = min(n_studios, len(rows))
+    home_rows = rows.loc[rows["local_ridership_cluster"] == home_cluster].copy()
+    if home_rows.empty:
+        home_rows = rows.copy()
 
-    remaining_count = requested_studio_count - 1
-    if remaining_count <= 0:
-        return selected_studio_ids
+    p = home_rows["weekly_bike_supply"] / home_rows["weekly_bike_supply"].sum()
+    home_idx = rng.choice(home_rows.index.to_numpy(), p=p.to_numpy())
+    picked = [str(home_rows.loc[home_idx, "studio_id"])]
 
-    remaining_studios = market_studios.loc[~market_studios["studio_id"].isin(selected_studio_ids)].copy()
-    remaining_count = min(remaining_count, len(remaining_studios))
-    if remaining_count <= 0:
-        return selected_studio_ids
+    left = n_studios - 1
+    if left <= 0:
+        return picked
 
-    remaining_probabilities = remaining_studios["weekly_bike_supply"] / remaining_studios["weekly_bike_supply"].sum()
-    selected_indices = rng.choice(remaining_studios.index.to_numpy(), size=remaining_count, replace=False, p=remaining_probabilities.to_numpy())
-    selected_studio_ids.extend(remaining_studios.loc[selected_indices, "studio_id"].astype(str).tolist())
+    rest = rows.loc[~rows["studio_id"].isin(picked)].copy()
+    left = min(left, len(rest))
+    if left <= 0:
+        return picked
 
-    return selected_studio_ids
+    p = rest["weekly_bike_supply"] / rest["weekly_bike_supply"].sum()
+    idx = rng.choice(rest.index.to_numpy(), size=left, replace=False, p=p.to_numpy())
+    picked.extend(rest.loc[idx, "studio_id"].astype(str).tolist())
+    return picked
 
-def allocate_classes_across_studios(baseline_class_count: int, regular_studio_ids: list[str], studio_data: pd.DataFrame, rng: np.random.Generator) -> dict[str, int]:
-    if isinstance(baseline_class_count, bool) or not isinstance(baseline_class_count, int):
-        raise TypeError("baseline_class_count must be an integer.")
-    if baseline_class_count <= 0:
-        raise ValueError("baseline_class_count must be positive.")
-    if not isinstance(regular_studio_ids, list):
-        raise TypeError("regular_studio_ids must be a list.")
-    if not regular_studio_ids:
-        raise ValueError("regular_studio_ids cannot be empty.")
+def init_capacity(studio_data: pd.DataFrame) -> dict[str, int]:
+    if not isinstance(studio_data, pd.DataFrame):
+        raise TypeError("studio_data must be a pandas DataFrame.")
+
+    cap_left: dict[str, int] = {}
+    for _, row in studio_data.iterrows():
+        cap_left[str(row["studio_id"])] = int(row["weekly_class_count"])
+    return cap_left
+
+def allocate_classes(n_classes: int, studio_ids: list[str], studio_data: pd.DataFrame, rng: np.random.Generator, market: str, cap_left: dict[str, int]) -> dict[str, int]:
+    if isinstance(n_classes, bool) or not isinstance(n_classes, int):
+        raise TypeError("n_classes must be an integer.")
+    if not isinstance(studio_ids, list):
+        raise TypeError("studio_ids must be a list.")
     if not isinstance(studio_data, pd.DataFrame):
         raise TypeError("studio_data must be a pandas DataFrame.")
     if not isinstance(rng, np.random.Generator):
         raise TypeError("rng must be a NumPy Generator.")
+    if not isinstance(market, str):
+        raise TypeError("market must be a string.")
+    if not isinstance(cap_left, dict):
+        raise TypeError("cap_left must be a dictionary.")
 
-    if len(regular_studio_ids) > baseline_class_count:
-        regular_studio_ids = regular_studio_ids[:baseline_class_count]
+    rows = studio_data.loc[studio_data["network_market"] == market.strip()].copy()
+    out: dict[str, int] = {}
+    left = n_classes
 
-    allocation = {studio_id: 1 for studio_id in regular_studio_ids}
-    remaining_classes = baseline_class_count - len(regular_studio_ids)
-    if remaining_classes <= 0:
-        return allocation
+    while left > 0:
+        preferred = [sid for sid in studio_ids if cap_left.get(sid, 0) > 0]
+        market_ids = [str(sid) for sid in rows["studio_id"] if cap_left.get(str(sid), 0) > 0]
+        candidates = preferred if preferred else market_ids
 
-    selected_studios = studio_data.set_index("studio_id").loc[regular_studio_ids]
-    weights = selected_studios["weekly_bike_supply"].astype(float)
-    probabilities = (weights / weights.sum()).to_numpy()
-    extra_allocations = rng.multinomial(n=remaining_classes, pvals=probabilities)
+        if not candidates:
+            raise RuntimeError("No remaining studio capacity in market '" + market + "'.")
 
-    for studio_id, extra_classes in zip(regular_studio_ids, extra_allocations):
-        allocation[studio_id] += int(extra_classes)
+        w = studio_data.set_index("studio_id").loc[candidates]["weekly_bike_supply"].astype(float)
+        p = (w / w.sum()).to_numpy()
+        pick = candidates[int(rng.choice(len(candidates), p=p))]
 
-    if sum(allocation.values()) != baseline_class_count:
-        raise RuntimeError("Studio class allocation did not preserve baseline_class_count.")
+        out[pick] = out.get(pick, 0) + 1
+        cap_left[pick] -= 1
+        left -= 1
 
-    return allocation
+    if sum(out.values()) != n_classes:
+        raise RuntimeError("Studio class allocation did not preserve n_classes.")
+    return out
 
-def summarize_studio_capacity_vs_demand(instructors: dict[str, Instructor], studios: dict[str, Studio]) -> pd.DataFrame:
-    #compare total instructor demand at each studio against available recurring class slots
-    demand_by_studio: dict[str, int] = {}
+def capacity_summary(instructors: dict[str, Instructor], studios: dict[str, Studio]) -> pd.DataFrame:
+    if not isinstance(instructors, dict):
+        raise TypeError("instructors must be a dictionary.")
+    if not isinstance(studios, dict):
+        raise TypeError("studios must be a dictionary.")
 
+    demand: dict[str, int] = {}
     for instructor in instructors.values():
-        for studio_id, class_count in instructor.baseline_studio_allocations.items():
-            demand_by_studio[studio_id] = demand_by_studio.get(studio_id, 0) + class_count
+        for sid, n in instructor.baseline_studio_allocations.items():
+            demand[sid] = demand.get(sid, 0) + n
 
     rows: list[dict[str, object]] = []
-    for studio_id, studio in studios.items():
-        requested_classes = demand_by_studio.get(studio_id, 0)
-        available_classes = studio.weekly_class_count
+    for sid, studio in studios.items():
+        req = demand.get(sid, 0)
+        avail = studio.weekly_class_count
         rows.append({
-            "studio_id": studio_id,
+            "studio_id": sid,
             "network_market": studio.network_market,
             "home_cluster": studio.local_ridership_cluster,
-            "available_classes": available_classes,
-            "requested_classes": requested_classes,
-            "surplus_or_shortfall": available_classes - requested_classes,
-            "overallocated": requested_classes > available_classes,
+            "available_classes": avail,
+            "requested_classes": req,
+            "surplus_or_shortfall": avail - req,
+            "overallocated": req > avail,
         })
 
     summary = pd.DataFrame(rows)
     if not summary.empty:
         summary = summary.sort_values(by=["overallocated", "studio_id"], ascending=[False, True]).reset_index(drop=True)
-
     return summary
 
-def count_overallocated_studios(instructors: dict[str, Instructor], studios: dict[str, Studio]) -> int:
-    summary = summarize_studio_capacity_vs_demand(instructors, studios)
+def count_overallocated(instructors: dict[str, Instructor], studios: dict[str, Studio]) -> int:
+    summary = capacity_summary(instructors, studios)
     if summary.empty:
         return 0
     return int(summary["overallocated"].sum())
