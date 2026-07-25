@@ -1,0 +1,51 @@
+sample_id,market,regions_listed,classes_jul20_26,studios_taught_count
+1,Greater NYC,NYC,8,1
+2,Greater NYC,NYC,0,0
+3,Greater NYC,NYC,8,3
+4,Greater NYC,Long Island,4,1
+5,Greater NYC,Connecticut; Westchester,19,2
+6,Greater NYC,Connecticut; Westchester,3,3
+7,Greater NYC,Connecticut,12,2
+8,Greater NYC,NYC,15,5
+9,Greater NYC,NYC,11,4
+10,Greater NYC,NYC,8,3
+11,Greater NYC,NYC,13,5
+12,Greater NYC,Long Island,4,1
+13,Greater NYC,New Jersey,7,1
+14,Greater NYC,NYC,14,4
+15,Greater NYC,Connecticut; Westchester,5,3
+16,Greater NYC,NYC,10,4
+17,Greater NYC,NYC,15,7
+18,DMV,DC; Maryland,1,1
+19,DMV,DC; Maryland; Virginia,12,4
+20,DMV,DC; Virginia,15,3
+21,DMV,DC; Maryland; Virginia,6,2
+22,Southern California,Southern California,14,2
+23,Southern California,Southern California,12,2
+24,Southern California,Southern California,7,2
+25,Southern California,Southern California,12,3
+26,Northern California,Bay Area; San Francisco,7,2
+27,Northern California,San Francisco,1,1
+28,Northern California,Bay Area; San Francisco,11,3
+29,Northern California,San Francisco,0,0
+30,Boston,Massachusetts,1,1
+31,Boston,Massachusetts,8,1
+32,Boston,Massachusetts,13,2
+33,South Florida,Miami,11,2
+34,South Florida,Miami,4,1
+35,Chicago,Chicago,11,2
+36,Chicago,Chicago,0,0
+37,Chicago,Chicago,12,2
+38,Philadelphia,Pennsylvania,7,2
+39,Philadelphia,Pennsylvania,6,2
+40,Dallas,Texas,5,1
+41,Dallas,Texas,5,1
+42,Houston,Texas,3,1
+43,Houston,Texas,2,1
+44,Austin,Texas,4,1
+45,Austin,Texas,6,1
+46,Atlanta,Atlanta,8,1
+47,Ann Arbor,Ann Arbor,8,1
+48,Seattle,Seattle,5,1
+49,Seattle,Seattle,7,1
+50,Northern California,San Francisco,0,0
