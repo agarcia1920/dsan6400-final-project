@@ -1,5 +1,5 @@
 # Functions for creating persistent studio class schedules.
-# Each studio's weekly class count is divided across the seven days of the week.
+# Each room's weekly class count is divided across the seven days of the week.
 # We are not assigning times yet, just how many classes happen on each day.
 
 import numpy as np
@@ -7,7 +7,7 @@ from soulcycle_network.config import DAYS_OF_WEEK
 from soulcycle_network.studio import Studio
 
 def divide_classes(weekly_class_count: int, rng: np.random.Generator) -> dict[str, int]:
-    #divide a studio's weekly class count across the seven days as evenly as possible
+    #divide a weekly class count across the seven days as evenly as possible
     if isinstance(weekly_class_count, bool) or not isinstance(weekly_class_count, int):
         raise TypeError("weekly_class_count must be an integer.")
     if weekly_class_count <= 0:
@@ -16,18 +16,14 @@ def divide_classes(weekly_class_count: int, rng: np.random.Generator) -> dict[st
         raise TypeError("rng must be a NumPy random Generator.")
 
     num_days = len(DAYS_OF_WEEK)
-
-    #start by giving every day the same floor number of classes
     min_classes_per_day = weekly_class_count // num_days
-    remaining_classes = weekly_class_count % num_days #these leftover classes get distributed randomly
+    remaining_classes = weekly_class_count % num_days
     daily_schedule = {day: min_classes_per_day for day in DAYS_OF_WEEK}
 
-    #randomly pick which days get the extra classes
     if remaining_classes > 0:
         for day in rng.choice(DAYS_OF_WEEK, size=remaining_classes, replace=False):
             daily_schedule[day] += 1
 
-    #make sure we did not lose or create any classes in the process
     if sum(daily_schedule.values()) != weekly_class_count:
         raise RuntimeError("Daily class counts do not sum to weekly_class_count.")
 
@@ -37,7 +33,20 @@ def create_weekly_schedule(studio: Studio, rng: np.random.Generator) -> dict[str
     #build the daily schedule for one studio and store it on the studio object
     if not isinstance(studio, Studio):
         raise TypeError("studio must be a Studio object.")
-    studio.daily_class_counts = divide_classes(studio.weekly_class_count, rng)
+
+    studio.room_daily_class_counts = {}
+    studio.daily_class_counts = {day: 0 for day in DAYS_OF_WEEK}
+
+    for room in studio.active_rooms:
+        room_weekly_count = studio.room_class_counts[room]
+        room_daily_schedule = divide_classes(room_weekly_count, rng)
+        studio.room_daily_class_counts[room] = room_daily_schedule
+        for day, class_count in room_daily_schedule.items():
+            studio.daily_class_counts[day] += class_count
+
+    if sum(studio.daily_class_counts.values()) != studio.weekly_class_count:
+        raise RuntimeError("Studio " + studio.studio_id + " daily class counts do not sum to weekly_class_count.")
+
     return studio.daily_class_counts
 
 def create_all_weekly_schedules(studios: dict[str, Studio], rng: np.random.Generator) -> dict[str, Studio]:

@@ -16,10 +16,26 @@ class Studio:
     market_tier: str
     local_ridership_cluster: str #where riders around this studio mostly come from
     weekly_class_count: int #total classes offered at this studio in a normal week
-    class_capacity: int #bikes available in a class at this studio
-    daily_class_counts: dict[str, int] = field(default_factory=dict) #filled in later by studio_schedule
+    room_class_counts: dict[str, int] = field(default_factory=dict) #classes per room, like {"A": 36, "B": 4}
+    room_capacities: dict[str, int] = field(default_factory=dict) #bikes per room, like {"A": 59, "B": 46}
+    daily_class_counts: dict[str, int] = field(default_factory=dict) #total classes per day across all rooms
+    room_daily_class_counts: dict[str, dict[str, int]] = field(default_factory=dict) #classes per day within each room
 
     def __post_init__(self) -> None:
+        #check string fields before stripping
+        if not isinstance(self.studio_id, str):
+            raise TypeError("studio_id must be a string.")
+        if not isinstance(self.studio_name, str):
+            raise TypeError("studio_name must be a string.")
+        if not isinstance(self.official_region, str):
+            raise TypeError("official_region must be a string.")
+        if not isinstance(self.network_market, str):
+            raise TypeError("network_market must be a string.")
+        if not isinstance(self.market_tier, str):
+            raise TypeError("market_tier must be a string.")
+        if not isinstance(self.local_ridership_cluster, str):
+            raise TypeError("local_ridership_cluster must be a string.")
+
         #remove whitespace from the studio's attributes
         self.studio_id = self.studio_id.strip()
         self.studio_name = self.studio_name.strip()
@@ -45,23 +61,58 @@ class Studio:
             raise ValueError("Invalid market_tier '" + self.market_tier + "' for studio " + self.studio_id + ". Expected one of " + str(sorted(MARKET_TIERS)) + ".")
 
         #check that weekly_class_count is an integer
-        #bool counts as a subclass of int in python so we exclude it here
         if isinstance(self.weekly_class_count, bool) or not isinstance(self.weekly_class_count, int):
             raise TypeError("weekly_class_count for " + self.studio_id + " must be an integer.")
-
-        #check that weekly_class_count is positive
         if self.weekly_class_count <= 0:
             raise ValueError("weekly_class_count for " + self.studio_id + " must be positive.")
 
-        #check that class_capacity is an integer
-        if isinstance(self.class_capacity, bool) or not isinstance(self.class_capacity, int):
-            raise TypeError("class_capacity for " + self.studio_id + " must be an integer.")
+        #check room-level class counts and capacities
+        if not isinstance(self.room_class_counts, dict):
+            raise TypeError("room_class_counts must be a dictionary.")
+        if not isinstance(self.room_capacities, dict):
+            raise TypeError("room_capacities must be a dictionary.")
+        if set(self.room_class_counts.keys()) != set(self.room_capacities.keys()):
+            raise ValueError("Studio " + self.studio_id + " room_class_counts and room_capacities must have the same room keys.")
 
-        #check that class_capacity is positive
-        if self.class_capacity <= 0:
-            raise ValueError("class_capacity for " + self.studio_id + " must be positive.")
+        total_room_classes = 0
+        for room, class_count in self.room_class_counts.items():
+            if not isinstance(room, str):
+                raise TypeError("room keys in room_class_counts must be strings.")
+            if isinstance(class_count, bool) or not isinstance(class_count, int):
+                raise TypeError("room_class_counts for " + self.studio_id + " must contain integers.")
+            if class_count < 0:
+                raise ValueError("room_class_counts for " + self.studio_id + " cannot be negative.")
+            total_room_classes += class_count
 
-        #check that daily_class_counts is a dictionary
-        #this starts empty and gets populated when we build the weekly schedule
+            capacity = self.room_capacities[room]
+            if isinstance(capacity, bool) or not isinstance(capacity, int):
+                raise TypeError("room_capacities for " + self.studio_id + " must contain integers.")
+            if capacity < 0:
+                raise ValueError("room_capacities for " + self.studio_id + " cannot be negative.")
+            if class_count > 0 and capacity <= 0:
+                raise ValueError("Active rooms for " + self.studio_id + " must have positive room_capacities.")
+
+        if total_room_classes <= 0:
+            raise ValueError("Studio " + self.studio_id + " must have at least one room with classes.")
+
+        if total_room_classes != self.weekly_class_count:
+            raise ValueError("Studio " + self.studio_id + " weekly_class_count must equal the sum of room_class_counts.")
+
         if not isinstance(self.daily_class_counts, dict):
             raise TypeError("daily_class_counts must be a dictionary.")
+        if not isinstance(self.room_daily_class_counts, dict):
+            raise TypeError("room_daily_class_counts must be a dictionary.")
+
+    @property
+    def weekly_bike_supply(self) -> int:
+        #total weekly bike supply across all active rooms
+        total = 0
+        for room, class_count in self.room_class_counts.items():
+            if class_count > 0:
+                total += class_count * self.room_capacities[room]
+        return total
+
+    @property
+    def active_rooms(self) -> list[str]:
+        #rooms that actually offer classes in a normal week
+        return sorted([room for room, class_count in self.room_class_counts.items() if class_count > 0])

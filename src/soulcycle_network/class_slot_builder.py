@@ -1,49 +1,52 @@
 # Functions for creating persistent baseline class slots.
-# Each studio's daily class counts become individual recurring class-slot objects.
+# Each studio's daily room schedules become individual recurring class-slot objects.
 
-from soulcycle_network.class_session import ClassSession
+from soulcycle_network.baseline_class_slot import BaselineClassSlot
 from soulcycle_network.config import DAYS_OF_WEEK
 from soulcycle_network.studio import Studio
 
-def create_studio_class_slots(studio: Studio) -> list[ClassSession]:
+def create_studio_class_slots(studio: Studio) -> list[BaselineClassSlot]:
     #create all persistent recurring class slots for one studio
     if not isinstance(studio, Studio):
         raise TypeError("studio must be a Studio object")
-
-    #the studio needs a daily schedule before we can build slots
-    if not studio.daily_class_counts:
+    if not studio.room_daily_class_counts:
         raise ValueError("Studio " + studio.studio_id + " does not have a daily schedule.")
 
-    #make sure every day of the week is represented
-    missing_days = set(DAYS_OF_WEEK) - set(studio.daily_class_counts)
-    if missing_days:
-        raise ValueError("Studio " + studio.studio_id + " is missing daily class counts for: " + str(sorted(missing_days)))
+    class_slots: list[BaselineClassSlot] = []
 
-    class_slots: list[ClassSession] = []
+    for room in studio.active_rooms:
+        room_daily_counts = studio.room_daily_class_counts.get(room)
+        if room_daily_counts is None:
+            raise ValueError("Studio " + studio.studio_id + " is missing a daily schedule for room " + room + ".")
 
-    #loop through each day and create one slot per class on that day
-    for day in DAYS_OF_WEEK:
-        num_classes = studio.daily_class_counts[day]
-        if isinstance(num_classes, bool) or not isinstance(num_classes, int) or num_classes < 0:
-            raise ValueError("Studio " + studio.studio_id + " has invalid class count for " + day + ": " + str(num_classes))
+        missing_days = set(DAYS_OF_WEEK) - set(room_daily_counts)
+        if missing_days:
+            raise ValueError("Studio " + studio.studio_id + " room " + room + " is missing daily class counts for: " + str(sorted(missing_days)))
 
-        for i in range(1, num_classes + 1):
-            day_code = day[:3].upper() #Monday becomes MON, Tuesday becomes TUE, etc.
-            slot_id = studio.studio_id + "_" + day_code + "_" + str(i).zfill(2)
-            class_slots.append(ClassSession(studio_id=studio.studio_id, slot_id=slot_id, day_of_week=day, daily_slot_index=i, capacity=studio.class_capacity, usual_instructor=None))
+        room_capacity = studio.room_capacities[room]
+
+        for day in DAYS_OF_WEEK:
+            num_classes = room_daily_counts[day]
+            if isinstance(num_classes, bool) or not isinstance(num_classes, int) or num_classes < 0:
+                raise ValueError("Studio " + studio.studio_id + " room " + room + " has invalid class count for " + day + ": " + str(num_classes))
+
+            for i in range(1, num_classes + 1):
+                day_code = day[:3].upper()
+                slot_id = studio.studio_id + "_" + day_code + "_" + room + "_" + str(i).zfill(2)
+                class_slots.append(BaselineClassSlot(studio_id=studio.studio_id, slot_id=slot_id, day_of_week=day, daily_slot_index=i, room=room, capacity=room_capacity, usual_instructor=None))
 
     if len(class_slots) != studio.weekly_class_count:
         raise RuntimeError("Expected " + str(studio.weekly_class_count) + " class slots, but created " + str(len(class_slots)))
 
     return class_slots
 
-def create_network_class_slots(studios: dict[str, Studio]) -> list[ClassSession]:
+def create_network_class_slots(studios: dict[str, Studio]) -> list[BaselineClassSlot]:
     #create all persistent recurring class slots for the entire network
     if not isinstance(studios, dict):
         raise TypeError("studios must be a dictionary of Studio objects")
 
-    all_class_slots: list[ClassSession] = []
-    seen_slots: set[str] = set() #track slot ids so we catch duplicates across studios
+    all_class_slots: list[BaselineClassSlot] = []
+    seen_slots: set[str] = set()
 
     for studio_id, studio in studios.items():
         if not isinstance(studio, Studio):

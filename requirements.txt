@@ -1,1 +1,6 @@
 pandas
+numpy
+Faker
+pytest
+networkx
+matplotlib

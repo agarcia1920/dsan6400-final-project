@@ -31,6 +31,10 @@ PROB_OFF_WEEK=0.08
 # Instructor deviation from normal classload 
 MAX_WEEKLY_DEVIATION=3 #in our simulation we will constrain instructor classload to be within 3 classes of the normal classload
 
+# Modeling assumption for instructor generation:
+# one standard-deviation increase in baseline class load raises expected regular studio count by this many studios
+CLASS_LOAD_STUDIO_EFFECT = 0.5
+
 
 # Rider behavior configuration
 # At the beginning of the simulation we will restrict riders to one class per day, but in the future we will allow riders to attend multiple classes per day
