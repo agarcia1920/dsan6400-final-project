@@ -1,4 +1,5 @@
 # Assign each instructor to their baseline recurring slots.
+# daily_slot_index is treated as a synchronized company-wide time-position proxy until explicit class times are modeled.
 
 import numpy as np
 from soulcycle_network.baseline_class_slot import BaselineClassSlot
@@ -19,13 +20,13 @@ def instructor_order(instructors: dict[str, Instructor], ids: list[str]) -> list
     ordered.sort(key=lambda iid: (len(instructors[iid].regular_studio_assignments), instructors[iid].baseline_class_count), reverse=True)
     return ordered
 
-def try_assign_baseline_slots(instructors: dict[str, Instructor], lookup: dict[str, BaselineClassSlot], open_by_studio: dict[str, list[BaselineClassSlot]], ids: list[str], rng: np.random.Generator) -> None:
+def try_assign_baseline_slots(instructors: dict[str, Instructor], open_by_studio: dict[str, list[BaselineClassSlot]], ids: list[str], rng: np.random.Generator) -> None:
     for iid in ids:
         instructor = instructors[iid]
         if not isinstance(instructor, Instructor):
             raise TypeError("Value stored under " + iid + " must be an Instructor object.")
 
-        slot_ids: list[str] = []
+        assigned_slots: list[BaselineClassSlot] = []
         day_counts = {day: 0 for day in DAYS_OF_WEEK}
         busy_times: set[tuple[str, int]] = set()
         studio_allocs = list(instructor.baseline_studio_allocations.items())
@@ -40,15 +41,15 @@ def try_assign_baseline_slots(instructors: dict[str, Instructor], lookup: dict[s
                 pick = int(rng.choice(len(eligible)))
                 slot = eligible[pick]
                 slot.usual_instructor = instructor.instructor_id
-                slot_ids.append(slot.slot_id)
+                assigned_slots.append(slot)
                 busy_times.add((slot.day_of_week, slot.daily_slot_index))
                 day_counts[slot.day_of_week] += 1
 
-        if len(slot_ids) != instructor.baseline_class_count:
-            raise RuntimeError("Instructor " + iid + " was assigned " + str(len(slot_ids)) + " slots, but baseline_class_count is " + str(instructor.baseline_class_count) + ".")
+        if len(assigned_slots) != instructor.baseline_class_count:
+            raise RuntimeError("Instructor " + iid + " was assigned " + str(len(assigned_slots)) + " slots, but baseline_class_count is " + str(instructor.baseline_class_count) + ".")
 
-        slot_ids.sort(key=lambda sid: (DAY_INDEX[lookup[sid].day_of_week], lookup[sid].daily_slot_index, sid))
-        instructor.baseline_slot_ids = slot_ids
+        assigned_slots.sort(key=lambda slot: (DAY_INDEX[slot.day_of_week], slot.daily_slot_index, slot.slot_id))
+        instructor.baseline_slot_ids = [slot.slot_id for slot in assigned_slots]
         instructor.baseline_day_counts = {day: n for day, n in day_counts.items() if n > 0}
 
 def assign_baseline_slots(instructors: dict[str, Instructor], class_slots: list[BaselineClassSlot], rng: np.random.Generator) -> list[BaselineClassSlot]:
@@ -59,7 +60,6 @@ def assign_baseline_slots(instructors: dict[str, Instructor], class_slots: list[
     if not isinstance(rng, np.random.Generator):
         raise TypeError("rng must be a NumPy Generator.")
 
-    lookup = {slot.slot_id: slot for slot in class_slots}
     open_by_studio: dict[str, list[BaselineClassSlot]] = {}
 
     for slot in class_slots:
@@ -75,7 +75,7 @@ def assign_baseline_slots(instructors: dict[str, Instructor], class_slots: list[
         ids = instructor_order(instructors, ids)
 
         try:
-            try_assign_baseline_slots(instructors, lookup, open_by_studio, ids, rng)
+            try_assign_baseline_slots(instructors, open_by_studio, ids, rng)
             validate_baseline(instructors, class_slots)
             return class_slots
         except RuntimeError:

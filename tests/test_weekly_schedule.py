@@ -14,6 +14,7 @@ def test_weekly_class_session_requires_substitution_flag():
         slot_id="GTWN_MON_A_01",
         studio_id="GTWN",
         day_of_week="Monday",
+        daily_slot_index=1,
         room="A",
         capacity=59,
         usual_instructor_id="I0001",
@@ -45,10 +46,16 @@ def test_pick_sub_prefers_same_market(studios_csv_path, active_instructors_csv_p
     assign_baseline_slots(instructors, class_slots, rng)
 
     slot = class_slots[0]
+    lookup = {s.slot_id: s for s in class_slots}
     off_ids = {slot.usual_instructor}
     counts = {iid: len(instructor.baseline_slot_ids) for iid, instructor in instructors.items()}
+    busy_times = {iid: set() for iid in instructors}
+    for instructor in instructors.values():
+        for slot_id in instructor.baseline_slot_ids:
+            s = lookup[slot_id]
+            busy_times[instructor.instructor_id].add((s.day_of_week, s.daily_slot_index))
 
-    sub_id = pick_sub(slot.studio_id, instructors[slot.usual_instructor].network_market, instructors, off_ids, counts, rng)
+    sub_id = pick_sub(slot.studio_id, instructors[slot.usual_instructor].network_market, slot.day_of_week, slot.daily_slot_index, instructors, off_ids, counts, busy_times, rng)
 
     assert sub_id != slot.usual_instructor
     assert instructors[sub_id].network_market == instructors[slot.usual_instructor].network_market

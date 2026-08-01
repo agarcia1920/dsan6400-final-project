@@ -20,7 +20,7 @@ from soulcycle_network.config import PROB_OFF_WEEK, RANDOM_SEED
 from soulcycle_network.instructor_generator import generate_instructors
 from soulcycle_network.studio_loader import load_studios
 from soulcycle_network.studio_schedule import create_all_weekly_schedules
-from soulcycle_network.weekly_schedule import create_weekly_class_sessions, summarize_week
+from soulcycle_network.weekly_schedule import create_weekly_schedule, summarize_week
 
 def main() -> None:
     rng = np.random.default_rng(RANDOM_SEED)
@@ -34,16 +34,16 @@ def main() -> None:
     assign_baseline_slots(instructors, class_slots, rng)
 
     week_rng = np.random.default_rng(RANDOM_SEED + 1)
-    sessions = create_weekly_class_sessions(1, instructors, class_slots, week_rng, PROB_OFF_WEEK)
-    summary = summarize_week(sessions)
-    off_ids = {s.usual_instructor_id for s in sessions if s.is_substitution}
+    result = create_weekly_schedule(1, instructors, class_slots, week_rng, PROB_OFF_WEEK)
+    summary = summarize_week(result.sessions)
 
     print("Week 1 sessions:", summary["total_sessions"])
-    print("Substitutions:", summary["substitutions"])
-    print("Off instructors:", len(off_ids))
+    print("Substitutions:", result.substitution_count)
+    print("Off instructors:", len(result.off_instructor_ids))
+    print("Uncovered sessions:", len(result.uncovered_session_ids))
     print("Assigned instructors:", summary["unique_assigned_instructors"])
 
-    for s in [x for x in sessions if x.is_substitution][:5]:
+    for s in [x for x in result.sessions if x.is_substitution][:5]:
         print(s.slot_id, "usual", s.usual_instructor_id, "assigned", s.assigned_instructor_id)
 
 if __name__ == "__main__":

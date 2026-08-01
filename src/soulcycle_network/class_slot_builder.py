@@ -12,8 +12,9 @@ def create_studio_class_slots(studio: Studio) -> list[BaselineClassSlot]:
         raise ValueError("Studio " + studio.studio_id + " does not have a daily schedule.")
 
     class_slots: list[BaselineClassSlot] = []
-
+    # iterate over all active rooms in the studio
     for room in studio.active_rooms:
+        # get the daily class counts for the room
         room_daily_counts = studio.room_daily_class_counts.get(room)
         if room_daily_counts is None:
             raise ValueError("Studio " + studio.studio_id + " is missing a daily schedule for room " + room + ".")
@@ -47,7 +48,9 @@ def create_network_class_slots(studios: dict[str, Studio]) -> list[BaselineClass
     all_class_slots: list[BaselineClassSlot] = []
     seen_slots: set[str] = set()
 
+    # iterate over all studios in the network
     for studio_id, studio in studios.items():
+        # validate input types
         if not isinstance(studio, Studio):
             raise TypeError("Studio " + studio_id + " is not a Studio object")
 

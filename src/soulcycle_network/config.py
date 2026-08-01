@@ -40,6 +40,25 @@ CLASS_LOAD_STUDIO_EFFECT = 0.5
 # At the beginning of the simulation we will restrict riders to one class per day, but in the future we will allow riders to attend multiple classes per day
 MAX_CLASSES_PER_DAY=1
 
+# Simulated rider population size (scaled down from implied full-network demand)
+TOTAL_SIMULATED_RIDERS=10000
+
+# Target average occupancy when sizing the implied real-world rider population
+TARGET_OCCUPANCY=0.70
+
+# Approximate mean annual rides per active rider, used for population sizing
+MEAN_ANNUAL_RIDES=12
+
+# Persistent annual ride propensity parameters
+# 27 annual rides is roughly the 90th percentile ("Top 10%"), so most riders attend less than once per week on average
+# median is about 5 annual rides; distribution is right-skewed
+RIDER_FREQUENCY_PARAMETERS={
+    "log_mean": 1.6094379124341003, #log(5)
+    "log_sd": 1.32,
+    "minimum": 1,
+    "maximum": 200,
+}
+
 # Analog network formation configuration
 # Riders will need to attend 3 classes together to form a familiarity (weaker) connection
 MIN_CLASSES_FOR_FAMILIARITY=3

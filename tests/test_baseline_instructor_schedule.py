@@ -74,11 +74,15 @@ def test_baseline_slots_have_no_time_conflicts(studios_csv_path, active_instruct
             assert time_key not in seen_times
             seen_times.add(time_key)
 
-def test_assign_baseline_slots_succeeds_across_seeds(studios_csv_path, active_instructors_csv_path, instructor_sample_csv_path, fake):
+def test_assign_baseline_slots_succeeds_across_seeds(studios_csv_path, active_instructors_csv_path, instructor_sample_csv_path):
     import numpy as np
+    from faker import Faker
 
     for seed in [6400, 6401, 6402, 6403, 6404, 7000, 8000, 9000, 10000, 12345]:
         rng = np.random.default_rng(seed)
+        fake = Faker("en_US")
+        fake.seed_instance(seed)
+
         studios = load_studios(studios_csv_path)
         create_all_weekly_schedules(studios, rng)
         class_slots = create_network_class_slots(studios)

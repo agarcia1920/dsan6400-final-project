@@ -28,3 +28,26 @@ def fake():
     fake = Faker()
     Faker.seed(6400)
     return fake
+
+@pytest.fixture
+def initialized_environment(studios_csv_path, active_instructors_csv_path, instructor_sample_csv_path, rng, fake):
+    from soulcycle_network.baseline_instructor_schedule import assign_baseline_slots
+    from soulcycle_network.class_slot_builder import create_network_class_slots
+    from soulcycle_network.instructor_generator import generate_instructors
+    from soulcycle_network.studio_loader import load_studios
+    from soulcycle_network.studio_schedule import create_all_weekly_schedules
+    from soulcycle_network.weekly_schedule import snapshot_baseline
+
+    studios = load_studios(studios_csv_path)
+    create_all_weekly_schedules(studios, rng)
+    baseline_slots = create_network_class_slots(studios)
+    instructors = generate_instructors(active_instructors_csv_path, instructor_sample_csv_path, studios_csv_path, rng, fake)
+    assign_baseline_slots(instructors, baseline_slots, rng)
+    baseline_snapshot = snapshot_baseline(baseline_slots)
+    return instructors, baseline_slots, baseline_snapshot
+
+@pytest.fixture
+def simulation_context(studios_csv_path, active_instructors_csv_path, instructor_sample_csv_path, rng, fake):
+    from soulcycle_network.simulation import init_simulation
+
+    return init_simulation(studios_csv_path, active_instructors_csv_path, instructor_sample_csv_path, rng, fake, n_riders=300)

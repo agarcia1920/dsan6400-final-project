@@ -4,11 +4,12 @@ from dataclasses import dataclass
 from soulcycle_network.config import DAYS_OF_WEEK
 
 @dataclass
-class WeeklyClassSession:
+class WeeklyClassSession: #class to represent a weekly class session
     week_number: int
     slot_id: str
     studio_id: str
     day_of_week: str
+    daily_slot_index: int
     room: str
     capacity: int
     usual_instructor_id: str
@@ -26,6 +27,10 @@ class WeeklyClassSession:
             raise TypeError("studio_id must be a string.")
         if not isinstance(self.day_of_week, str):
             raise TypeError("day_of_week must be a string.")
+        if isinstance(self.daily_slot_index, bool) or not isinstance(self.daily_slot_index, int):
+            raise TypeError("daily_slot_index for " + self.slot_id + " must be an integer.")
+        if self.daily_slot_index <= 0:
+            raise ValueError("daily_slot_index for " + self.slot_id + " must be positive.")
         if not isinstance(self.room, str):
             raise TypeError("room must be a string.")
         if not isinstance(self.usual_instructor_id, str):
