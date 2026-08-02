@@ -3,10 +3,10 @@
 from dataclasses import dataclass, field
 import numpy as np
 from soulcycle_network.attendance_record import AttendanceRecord
-from soulcycle_network.config import MAX_CLASSES_PER_DAY
+from soulcycle_network.config import MARKET_WIDE_EXPLORATION_PROB, MAX_CLASSES_PER_DAY
 from soulcycle_network.rider import Rider
 from soulcycle_network.rider_coordination import CoordinationPair
-from soulcycle_network.rider_parameters import draw_weekly_ride_count, simulated_session_capacity
+from soulcycle_network.rider_parameters import coerce_float, draw_weekly_ride_count, simulated_session_capacity
 from soulcycle_network.weekly_class_session import WeeklyClassSession
 from soulcycle_network.weekly_schedule import WeeklyScheduleResult
 
@@ -34,12 +34,33 @@ class WeeklyBookingResult: #class to store the weekly booking result
     enrollments: dict[str, list[str]] = field(default_factory=dict)
     unmet_demand: int = 0
     coordinated_bookings: int = 0
+    total_sim_seats: int = 0
+    seats_filled: int = 0
+
+def build_market_studios(studio_markets: dict[str, str]) -> dict[str, set[str]]:
+    out: dict[str, set[str]] = {}
+    for studio_id, market in studio_markets.items():
+        out.setdefault(market, set()).add(studio_id)
+    return out
+
+def default_eligible_studio_ids(rider: Rider, cluster_studios: dict[str, set[str]]) -> set[str]:
+    home = cluster_studios.get(rider.home_cluster, set())
+    return home.union(rider.preferred_studio_ids)
+
+def resolve_eligible_studio_ids(
+    rider: Rider,
+    cluster_studios: dict[str, set[str]],
+    market_studios: dict[str, set[str]],
+    explore_market: bool,
+) -> set[str]:
+    if explore_market:
+        return set(market_studios.get(rider.home_market, set()))
+    return default_eligible_studio_ids(rider, cluster_studios)
 
 def build_bookable_sessions(schedule: WeeklyScheduleResult, scale: float, studio_markets: dict[str, str]) -> dict[str, BookableSession]:
     if not isinstance(schedule, WeeklyScheduleResult):
         raise TypeError("schedule must be a WeeklyScheduleResult.")
-    if not isinstance(scale, float):
-        raise TypeError("scale must be a float.")
+    scale = coerce_float(scale, "scale")
     if not isinstance(studio_markets, dict):
         raise TypeError("studio_markets must be a dictionary.")
     if scale <= 0:
@@ -102,18 +123,27 @@ def pick_session(rider: Rider, candidates: list[BookableSession], home_cluster_s
     pick = int(rng.choice(len(open_sessions), p=weights / weights.sum())) #pick the session with the highest weight
     return open_sessions[pick] #return the session
 
-def rider_candidates(rider: Rider, sessions: dict[str, BookableSession], booked_days: set[str]) -> list[BookableSession]: #function to get the rider candidates
+def rider_candidates(
+    rider: Rider,
+    sessions: dict[str, BookableSession],
+    booked_days: set[str],
+    eligible_studio_ids: set[str],
+) -> list[BookableSession]: #function to get the rider candidates
     if not isinstance(rider, Rider):
         raise TypeError("rider must be a Rider.")
     if not isinstance(sessions, dict):
         raise TypeError("sessions must be a dictionary.")
     if not isinstance(booked_days, set):
         raise TypeError("booked_days must be a set.")
+    if not isinstance(eligible_studio_ids, set):
+        raise TypeError("eligible_studio_ids must be a set.")
 
     out: list[BookableSession] = [] #list to store the rider candidates
     for session in sessions.values():
         if session.market != rider.home_market:
             continue #skip the session if it is not in the rider's home market
+        if session.studio_id not in eligible_studio_ids:
+            continue
         if session.day_of_week in booked_days:
             continue #skip the session if it is already booked
         if session.seats_left <= 0:
@@ -159,7 +189,15 @@ def apply_attendance(rider: Rider, record: AttendanceRecord) -> None: #function 
     rider.attended_instructor_counts[record.assigned_instructor_id] = rider.attended_instructor_counts.get(record.assigned_instructor_id, 0) + 1 #increment the instructor count
     rider.attended_studio_counts[record.studio_id] = rider.attended_studio_counts.get(record.studio_id, 0) + 1 #increment the studio count
 
-def book_coordination_pair(pair: CoordinationPair, riders: dict[str, Rider], sessions: dict[str, BookableSession], cluster_studios: dict[str, set[str]], rider_days: dict[str, set[str]], result: WeeklyBookingResult, rng: np.random.Generator) -> bool: #function to book the coordination pair
+def book_coordination_pair(
+    pair: CoordinationPair,
+    riders: dict[str, Rider],
+    sessions: dict[str, BookableSession],
+    cluster_studios: dict[str, set[str]],
+    rider_days: dict[str, set[str]],
+    result: WeeklyBookingResult,
+    rng: np.random.Generator,
+) -> bool: #function to book the coordination pair
     if not isinstance(pair, CoordinationPair):
         raise TypeError("pair must be a CoordinationPair.")
     if not isinstance(riders, dict):
@@ -179,11 +217,16 @@ def book_coordination_pair(pair: CoordinationPair, riders: dict[str, Rider], ses
     rider_b = riders[pair.rider_b]
     days_a = rider_days.get(rider_a.rider_id, set())
     days_b = rider_days.get(rider_b.rider_id, set())
+    eligible_studios = default_eligible_studio_ids(rider_a, cluster_studios).union(
+        default_eligible_studio_ids(rider_b, cluster_studios)
+    )
 
     shared: list[BookableSession] = [] #list to store the shared sessions
     for session in sessions.values():
         if session.market != rider_a.home_market or session.market != rider_b.home_market:
-            continue #skip the session if it is not in the rider's home market  
+            continue #skip the session if it is not in the rider's home market
+        if session.studio_id not in eligible_studios:
+            continue
         if session.day_of_week in days_a or session.day_of_week in days_b:
             continue #skip the session if it is already booked
         if session.seats_left < 2:
@@ -229,8 +272,7 @@ def book_week(schedule: WeeklyScheduleResult, riders: dict[str, Rider], scale: f
         raise TypeError("schedule must be a WeeklyScheduleResult.")
     if not isinstance(riders, dict):
         raise TypeError("riders must be a dictionary.")
-    if not isinstance(scale, float):
-        raise TypeError("scale must be a float.")
+    scale = coerce_float(scale, "scale")
     if not isinstance(studio_markets, dict):
         raise TypeError("studio_markets must be a dictionary.")
     if not isinstance(cluster_studios, dict):
@@ -243,6 +285,7 @@ def book_week(schedule: WeeklyScheduleResult, riders: dict[str, Rider], scale: f
         raise TypeError("rng must be a NumPy Generator.")
 
     sessions = build_bookable_sessions(schedule, scale, studio_markets)
+    market_studios = build_market_studios(studio_markets)
     result = WeeklyBookingResult(week_number=schedule.week_number) #create the booking result
 
     rider_days: dict[str, set[str]] = {rid: set() for rid in riders} #dictionary to store the rider days
@@ -266,9 +309,11 @@ def book_week(schedule: WeeklyScheduleResult, riders: dict[str, Rider], scale: f
 
         home_studios = cluster_studios.get(rider.home_cluster, set()) #get the home studios for the rider
         booked = rider_days.setdefault(rider_id, set()) #get the booked days for the rider
+        explore_market = rng.random() < MARKET_WIDE_EXPLORATION_PROB
+        eligible_studios = resolve_eligible_studio_ids(rider, cluster_studios, market_studios, explore_market)
 
         for _ in range(target):
-            candidates = rider_candidates(rider, sessions, booked) #get the candidates for the rider
+            candidates = rider_candidates(rider, sessions, booked, eligible_studios) #get the candidates for the rider
             session = pick_session(rider, candidates, home_studios, rng)
             if session is None:
                 result.unmet_demand += 1 #increment the unmet demand count
@@ -279,6 +324,9 @@ def book_week(schedule: WeeklyScheduleResult, riders: dict[str, Rider], scale: f
 
     for record in result.records:
         apply_attendance(riders[record.rider_id], record)
+
+    result.total_sim_seats = sum(session.sim_capacity for session in sessions.values())
+    result.seats_filled = sum(session.enrolled for session in sessions.values())
 
     return result
 

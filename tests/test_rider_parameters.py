@@ -15,6 +15,20 @@ def test_draw_annual_ride_rate_median_near_five():
     assert 3.0 < float(np.median(rates)) < 8.0
     assert float(np.percentile(rates, 90)) >= 20.0
 
+def test_generated_annual_ride_mean():
+    rng = np.random.default_rng(6400)
+
+    rates = np.array([
+        draw_annual_ride_rate(rng)
+        for _ in range(100_000)
+    ])
+
+    assert 11.0 <= rates.mean() <= 13.0
+
+def test_coerce_float_accepts_integers():
+    assert simulated_session_capacity(59, 0.05) == 3
+    assert estimate_implied_population(10000, target_occupancy=1) == 43333
+
 def test_draw_weekly_ride_count_allows_zero_weeks():
     rider = Rider(
         rider_id="R000001",

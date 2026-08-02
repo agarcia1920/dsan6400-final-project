@@ -70,6 +70,12 @@ MIN_CLASSES_FOR_SOCIAL_TIE = 6
 # A value of 0.95 means that 95% of the previous tie strength remains before new weekly encounters are added.
 TIE_DECAY_RATE = 0.95
 
+# Social ties require cumulative co-attendance and current tie strength after decay.
+MIN_ACTIVE_TIE_STRENGTH_FOR_SOCIAL_TIE = 1.0
+
+# Probability a rider may book at any studio in their home market rather than preferred/home-cluster studios only.
+MARKET_WIDE_EXPLORATION_PROB = 0.05
+
 # Rider coordination configuration
 # Once riders form an analog social tie, they may coordinate future class attendance directly through ordinary offline communication, such as talking after class or texting privately.
 # These limits prevent coordination from overwhelming independent rider preferences.

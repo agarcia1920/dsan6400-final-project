@@ -13,7 +13,7 @@ from soulcycle_network.network_formation import NetworkState, decay_ties, empty_
 from soulcycle_network.rider import Rider
 from soulcycle_network.rider_coordination import plan_coordination
 from soulcycle_network.rider_generator import generate_riders, load_studio_data
-from soulcycle_network.rider_parameters import estimate_implied_population, simulation_scale
+from soulcycle_network.rider_parameters import estimate_implied_population, mean_generated_annual_ride_rate, simulation_scale
 from soulcycle_network.studio import Studio
 from soulcycle_network.studio_loader import load_studios
 from soulcycle_network.studio_schedule import create_all_weekly_schedules
@@ -34,6 +34,7 @@ class SimulationContext: #class to store the simulation context
     riders: dict[str, Rider]
     scale: float
     implied_population: int
+    generated_mean_annual_ride_rate: float
     studio_markets: dict[str, str]
     cluster_studios: dict[str, set[str]]
 
@@ -69,7 +70,8 @@ def init_simulation(studio_path: str | Path, active_path: str | Path, sample_pat
 
     studio_data = load_studio_data(studio_path) #load the studio data
     total_supply = int(studio_data["weekly_bike_supply"].sum())
-    implied = estimate_implied_population(total_supply) #estimate the implied population
+    generated_mean = mean_generated_annual_ride_rate(riders)
+    implied = estimate_implied_population(total_supply, mean_annual_rides=generated_mean) #estimate the implied population
     scale = simulation_scale(implied, n_riders)
 
     studio_markets = studio_data.set_index("studio_id")["network_market"].astype(str).to_dict()
@@ -82,6 +84,7 @@ def init_simulation(studio_path: str | Path, active_path: str | Path, sample_pat
         riders=riders,
         scale=scale,
         implied_population=implied,
+        generated_mean_annual_ride_rate=generated_mean,
         studio_markets=studio_markets,
         cluster_studios=cluster_studios,
     )
@@ -131,7 +134,7 @@ def run_simulation(ctx: SimulationContext, rng: np.random.Generator, n_weeks: in
         implied_population=ctx.implied_population,
     )
 
-def summarize_simulation(result: SimulationResult, n_instructors: int) -> dict[str, float]: #function to summarize the simulation
+def summarize_simulation(result: SimulationResult, n_instructors: int, generated_mean_annual_ride_rate: float | None = None) -> dict[str, float]: #function to summarize the simulation
     if not isinstance(result, SimulationResult):
         raise TypeError("result must be a SimulationResult.")
     if isinstance(n_instructors, bool) or not isinstance(n_instructors, int):
@@ -148,6 +151,9 @@ def summarize_simulation(result: SimulationResult, n_instructors: int) -> dict[s
         weekly_attendance = [len(w.booking.records) for w in result.week_results]
         booking_stats["avg_attendance_per_week"] = float(np.mean(weekly_attendance))
         booking_stats["max_attendance_in_week"] = float(max(weekly_attendance))
+        total_seats = sum(w.booking.total_sim_seats for w in result.week_results)
+        filled_seats = sum(w.booking.seats_filled for w in result.week_results)
+        booking_stats["seat_occupancy_rate"] = float(filled_seats / total_seats) if total_seats > 0 else 0.0
     #summarize the network stats
     network_stats = summarize_network(result.network_state)
     out = dict(schedule_stats)
@@ -155,6 +161,8 @@ def summarize_simulation(result: SimulationResult, n_instructors: int) -> dict[s
     out.update(network_stats)
     out["simulation_scale"] = result.scale
     out["implied_population"] = float(result.implied_population)
+    if generated_mean_annual_ride_rate is not None:
+        out["generated_mean_annual_ride_rate"] = float(generated_mean_annual_ride_rate)
     return out
 
 def default_paths(data_dir: str | Path) -> tuple[Path, Path, Path]: #function to get the default paths
@@ -171,5 +179,5 @@ def run_default_simulation(data_dir: str | Path, seed: int = RANDOM_SEED, n_week
 
     ctx = init_simulation(studio_path, active_path, sample_path, rng, fake, n_riders=n_riders)
     result = run_simulation(ctx, rng, n_weeks=n_weeks)
-    summary = summarize_simulation(result, len(ctx.instructors))
+    summary = summarize_simulation(result, len(ctx.instructors), ctx.generated_mean_annual_ride_rate)
     return ctx, result, summary

@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass, field
 
+import numpy as np
+
 @dataclass
 class Rider:
     rider_id: str
@@ -40,8 +42,12 @@ class Rider:
         if not self.home_cluster:
             raise ValueError("Rider " + self.rider_id + " must have a home_cluster.")
 
-        if isinstance(self.baseline_annual_ride_rate, bool) or not isinstance(self.baseline_annual_ride_rate, float):
-            raise TypeError("baseline_annual_ride_rate for " + self.rider_id + " must be a float.")
+        if isinstance(self.baseline_annual_ride_rate, bool) or not isinstance(
+            self.baseline_annual_ride_rate,
+            (int, float, np.integer, np.floating),
+        ):
+            raise TypeError("baseline_annual_ride_rate for " + self.rider_id + " must be a number.")
+        self.baseline_annual_ride_rate = float(self.baseline_annual_ride_rate)
         if self.baseline_annual_ride_rate <= 0:
             raise ValueError("baseline_annual_ride_rate for " + self.rider_id + " must be positive.")
 

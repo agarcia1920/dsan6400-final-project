@@ -36,7 +36,11 @@ def test_familiarity_and_social_thresholds():
     assert key not in social_tie_pairs(state)
 
     state.co_counts[key] = MIN_CLASSES_FOR_SOCIAL_TIE
+    state.tie_strength[key] = 6.0
     assert key in social_tie_pairs(state)
+
+    state.tie_strength[key] = 0.5
+    assert key not in social_tie_pairs(state)
 
 def test_decay_ties():
     state = NetworkState()

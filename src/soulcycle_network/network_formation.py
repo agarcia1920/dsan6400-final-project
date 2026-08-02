@@ -2,7 +2,8 @@
 
 from dataclasses import dataclass, field
 import networkx as nx
-from soulcycle_network.config import MIN_CLASSES_FOR_FAMILIARITY, MIN_CLASSES_FOR_SOCIAL_TIE, TIE_DECAY_RATE
+from soulcycle_network.config import MIN_ACTIVE_TIE_STRENGTH_FOR_SOCIAL_TIE, MIN_CLASSES_FOR_FAMILIARITY, MIN_CLASSES_FOR_SOCIAL_TIE, TIE_DECAY_RATE
+from soulcycle_network.rider_parameters import coerce_float
 
 @dataclass
 class NetworkState:
@@ -38,8 +39,7 @@ def decay_ties(state: NetworkState, rate: float = TIE_DECAY_RATE) -> None:
     #validate the input types and values
     if not isinstance(state, NetworkState):
         raise TypeError("state must be a NetworkState.")
-    if not isinstance(rate, float):
-        raise TypeError("rate must be a float.")
+    rate = coerce_float(rate, "rate")
     if rate < 0 or rate > 1:
         raise ValueError("rate must be between 0 and 1.")
 
@@ -92,7 +92,7 @@ def social_tie_pairs(state: NetworkState) -> set[tuple[str, str]]:
 
     out: set[tuple[str, str]] = set() #set to store the social tie pairs
     for key, count in state.co_counts.items():
-        if count >= MIN_CLASSES_FOR_SOCIAL_TIE:
+        if count >= MIN_CLASSES_FOR_SOCIAL_TIE and state.tie_strength.get(key, 0.0) >= MIN_ACTIVE_TIE_STRENGTH_FOR_SOCIAL_TIE:
             out.add(key) #add the key to the set
     return out
 
@@ -144,6 +144,8 @@ def summarize_network(state: NetworkState) -> dict[str, float]:
     fam = familiarity_pairs(state) #get the familiarity pairs
     social = social_tie_pairs(state) #get the social tie pairs
     graph = to_graph(state, MIN_CLASSES_FOR_FAMILIARITY)
+    degrees = [deg for _, deg in graph.degree()]
+    components = sorted((len(c) for c in nx.connected_components(graph)), reverse=True)
 
     return {
         "pair_count": float(len(state.co_counts)), #get the number of pairs
@@ -151,5 +153,7 @@ def summarize_network(state: NetworkState) -> dict[str, float]:
         "social_tie_pair_count": float(len(social)), #get the number of social tie pairs
         "graph_nodes": float(graph.number_of_nodes()),
         "graph_edges": float(graph.number_of_edges()), #get the number of edges
+        "mean_degree": float(sum(degrees) / len(degrees)) if degrees else 0.0,
+        "largest_connected_component": float(components[0]) if components else 0.0,
         "mean_tie_strength": float(sum(state.tie_strength.values()) / len(state.tie_strength)) if state.tie_strength else 0.0,
     }

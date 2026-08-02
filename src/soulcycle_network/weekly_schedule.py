@@ -8,6 +8,7 @@ import numpy as np
 from soulcycle_network.baseline_class_slot import BaselineClassSlot
 from soulcycle_network.config import MAX_WEEKLY_DEVIATION, PROB_OFF_WEEK
 from soulcycle_network.instructor import Instructor
+from soulcycle_network.rider_parameters import coerce_float
 from soulcycle_network.weekly_class_session import WeeklyClassSession
 
 MAX_OFF_TRIES = 100
@@ -25,8 +26,7 @@ def draw_off_instructors(instructors: dict[str, Instructor], rng: np.random.Gene
         raise TypeError("instructors must be a dictionary.")
     if not isinstance(rng, np.random.Generator):
         raise TypeError("rng must be a NumPy Generator.")
-    if not isinstance(prob_off, float):
-        raise TypeError("prob_off must be a float.")
+    prob_off = coerce_float(prob_off, "prob_off")
     if prob_off < 0 or prob_off > 1:
         raise ValueError("prob_off must be between 0 and 1.")
 

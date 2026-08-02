@@ -4,6 +4,11 @@ import numpy as np
 from soulcycle_network.config import DAYS_OF_WEEK, MAX_CLASSES_PER_DAY, MEAN_ANNUAL_RIDES, RIDER_FREQUENCY_PARAMETERS, TARGET_OCCUPANCY, TOTAL_SIMULATED_RIDERS
 from soulcycle_network.rider import Rider
 
+def coerce_float(value: object, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float, np.integer, np.floating)):
+        raise TypeError(name + " must be a number.")
+    return float(value)
+
 def draw_annual_ride_rate(rng: np.random.Generator, params: dict[str, float] | None = None) -> float:
     if not isinstance(rng, np.random.Generator):
         raise TypeError("rng must be a NumPy Generator.")
@@ -30,13 +35,19 @@ def draw_weekly_ride_count(rider: Rider, rng: np.random.Generator) -> int:
     weekly_cap = len(DAYS_OF_WEEK) * MAX_CLASSES_PER_DAY
     return min(int(rng.poisson(weekly_rate)), weekly_cap) #return the weekly ride count
 
+def mean_generated_annual_ride_rate(riders: dict[str, Rider]) -> float:
+    if not isinstance(riders, dict):
+        raise TypeError("riders must be a dictionary.")
+    if not riders:
+        raise ValueError("riders must not be empty.")
+    rates = [rider.baseline_annual_ride_rate for rider in riders.values()]
+    return float(np.mean(rates))
+
 def estimate_implied_population(total_weekly_bike_supply: int, target_occupancy: float = TARGET_OCCUPANCY, mean_annual_rides: float = float(MEAN_ANNUAL_RIDES)) -> int:
     if isinstance(total_weekly_bike_supply, bool) or not isinstance(total_weekly_bike_supply, int): 
         raise TypeError("total_weekly_bike_supply must be an integer.")
-    if not isinstance(target_occupancy, float):
-        raise TypeError("target_occupancy must be a float.")
-    if isinstance(mean_annual_rides, bool) or not isinstance(mean_annual_rides, (int, float)):
-        raise TypeError("mean_annual_rides must be a number.")
+    target_occupancy = coerce_float(target_occupancy, "target_occupancy")
+    mean_annual_rides = coerce_float(mean_annual_rides, "mean_annual_rides")
     if total_weekly_bike_supply <= 0:
         raise ValueError("total_weekly_bike_supply must be positive.")
     if target_occupancy <= 0 or target_occupancy > 1:
@@ -61,8 +72,7 @@ def simulation_scale(implied_population: int, total_simulated_riders: int = TOTA
 def simulated_session_capacity(real_capacity: int, scale: float) -> int: #function to calculate the simulated session capacity
     if isinstance(real_capacity, bool) or not isinstance(real_capacity, int):
         raise TypeError("real_capacity must be an integer.")
-    if not isinstance(scale, float):
-        raise TypeError("scale must be a float.")
+    scale = coerce_float(scale, "scale")
     if real_capacity <= 0:
         raise ValueError("real_capacity must be positive.")
     if scale <= 0:
