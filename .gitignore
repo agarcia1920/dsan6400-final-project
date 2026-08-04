@@ -1,17 +1,28 @@
+# macOS
 .DS_Store
+
+# Python
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# Virtual environments and secrets
 .venv/
 venv/
 .env
-data/processed/
+
+# Jupyter
 .ipynb_checkpoints/
+
+# Generated project artifacts
 outputs/
-.coverage
-htmlcov/
-coverage.xml
-.pyright/
+
+# Editors
 .vscode/
 .idea/
+
+# Temporary files
 *.log
+*.tmp
+*.bak
+*~
