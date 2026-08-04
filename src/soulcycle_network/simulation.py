@@ -3,22 +3,22 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 import numpy as np
-from soulcycle_network.baseline_instructor_schedule import assign_baseline_slots
-from soulcycle_network.baseline_class_slot import BaselineClassSlot
-from soulcycle_network.class_slot_builder import create_network_class_slots
+from soulcycle_network.instructors import assign_baseline_slots
+from soulcycle_network.studios import BaselineClassSlot
+from soulcycle_network.studios import create_network_class_slots
 from soulcycle_network.config import RANDOM_SEED, TOTAL_SIMULATED_RIDERS, TOTAL_WEEKS
-from soulcycle_network.instructor import Instructor
-from soulcycle_network.instructor_generator import generate_instructors
+from soulcycle_network.instructors import Instructor
+from soulcycle_network.instructors import generate_instructors
 from soulcycle_network.network_formation import NetworkState, decay_ties, empty_network, summarize_network, update_from_enrollments
-from soulcycle_network.rider import Rider
-from soulcycle_network.rider_coordination import plan_coordination
-from soulcycle_network.rider_generator import generate_riders, load_studio_data
-from soulcycle_network.rider_parameters import estimate_implied_population, mean_generated_annual_ride_rate, simulation_scale
-from soulcycle_network.studio import Studio
-from soulcycle_network.studio_loader import load_studios
-from soulcycle_network.studio_schedule import create_all_weekly_schedules
-from soulcycle_network.weekly_booking import WeeklyBookingResult, book_week, draw_weekly_counts, summarize_booking
-from soulcycle_network.weekly_schedule import WeeklyScheduleResult, create_weekly_schedule, summarize_weekly_simulation
+from soulcycle_network.riders import Rider
+from soulcycle_network.coordination import plan_coordination
+from soulcycle_network.riders import generate_riders, load_studio_data
+from soulcycle_network.riders import estimate_implied_population, mean_generated_annual_ride_rate, simulation_scale
+from soulcycle_network.studios import Studio
+from soulcycle_network.studios import load_studios
+from soulcycle_network.studios import create_all_weekly_schedules
+from soulcycle_network.weekly import WeeklyBookingResult, book_week, draw_weekly_counts, summarize_booking
+from soulcycle_network.weekly import WeeklyScheduleResult, create_weekly_schedule, summarize_weekly_simulation
 
 @dataclass
 class WeekResult: #class to store the week result

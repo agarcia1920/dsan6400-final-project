@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 import networkx as nx
 from soulcycle_network.config import MIN_ACTIVE_TIE_STRENGTH_FOR_SOCIAL_TIE, MIN_CLASSES_FOR_FAMILIARITY, MIN_CLASSES_FOR_SOCIAL_TIE, TIE_DECAY_RATE
-from soulcycle_network.rider_parameters import coerce_float
+from soulcycle_network.riders import coerce_float
 
 @dataclass
 class NetworkState:
@@ -135,6 +135,14 @@ def to_graph(state: NetworkState, min_co_count: int = MIN_CLASSES_FOR_FAMILIARIT
         a, b = key #get the pair
         graph.add_edge(a, b, co_count=count, tie_strength=state.tie_strength.get(key, 0.0)) #add the edge to the graph
     return graph #return the graph
+
+def clone_network_state(state: NetworkState) -> NetworkState:
+    if not isinstance(state, NetworkState):
+        raise TypeError("state must be a NetworkState.")
+    return NetworkState(
+        co_counts=dict(state.co_counts),
+        tie_strength=dict(state.tie_strength),
+    )
 
 def summarize_network(state: NetworkState) -> dict[str, float]:
     #validate the input types and values

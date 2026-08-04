@@ -31,12 +31,12 @@ def fake():
 
 @pytest.fixture
 def initialized_environment(studios_csv_path, active_instructors_csv_path, instructor_sample_csv_path, rng, fake):
-    from soulcycle_network.baseline_instructor_schedule import assign_baseline_slots
-    from soulcycle_network.class_slot_builder import create_network_class_slots
-    from soulcycle_network.instructor_generator import generate_instructors
-    from soulcycle_network.studio_loader import load_studios
-    from soulcycle_network.studio_schedule import create_all_weekly_schedules
-    from soulcycle_network.weekly_schedule import snapshot_baseline
+    from soulcycle_network.instructors import assign_baseline_slots
+    from soulcycle_network.studios import create_network_class_slots
+    from soulcycle_network.instructors import generate_instructors
+    from soulcycle_network.studios import load_studios
+    from soulcycle_network.studios import create_all_weekly_schedules
+    from soulcycle_network.weekly import snapshot_baseline
 
     studios = load_studios(studios_csv_path)
     create_all_weekly_schedules(studios, rng)

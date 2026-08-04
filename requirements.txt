@@ -4,3 +4,5 @@ Faker
 pytest
 networkx
 matplotlib
+scipy
+imageio
