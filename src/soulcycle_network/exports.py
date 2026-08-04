@@ -1,4 +1,4 @@
-"""Export simulation outputs to analysis-ready CSV tables."""
+# Exports attendance, pair history, node attributes, edge lists, and longitudinal tables
 
 from __future__ import annotations
 
@@ -83,8 +83,6 @@ EDGE_COLUMNS = [
 
 @dataclass
 class PairWeekTracker:
-    """Track when rider pairs first meet and cross network thresholds."""
-
     first_shared_week: dict[tuple[str, str], int] = field(
         default_factory=dict
     )
@@ -106,7 +104,6 @@ class PairWeekTracker:
         state: NetworkState,
         week_number: int,
     ) -> None:
-        """Update pair-level timing information for one simulation week."""
         for key, count in state.co_counts.items():
             previous_count = self.previous_co_counts.get(key, 0)
 
@@ -133,18 +130,9 @@ class PairWeekTracker:
                 self.became_social_week[key] = week_number
 
 
-def rider_lookup(
-    ctx: SimulationContext,
-) -> tuple[dict[str, str], dict[str, str]]:
-    """Return rider-to-cluster and rider-to-market lookup dictionaries."""
-    cluster = {
-        rider.rider_id: rider.home_cluster
-        for rider in ctx.riders.values()
-    }
-    market = {
-        rider.rider_id: rider.home_market
-        for rider in ctx.riders.values()
-    }
+def rider_lookup(ctx: SimulationContext) -> tuple[dict[str, str], dict[str, str]]:
+    cluster = {rider.rider_id: rider.home_cluster for rider in ctx.riders.values()}
+    market = {rider.rider_id: rider.home_market for rider in ctx.riders.values()}
     return cluster, market
 
 
@@ -152,7 +140,6 @@ def build_attendance_frame(
     ctx: SimulationContext,
     result: SimulationResult,
 ) -> pd.DataFrame:
-    """Convert weekly booking records into an attendance table."""
     rows: list[dict[str, object]] = []
 
     for week in result.week_results:
@@ -188,17 +175,11 @@ def build_attendance_frame(
 def build_weekly_summary_frame(
     result: SimulationResult,
 ) -> pd.DataFrame:
-    """Create one operational summary row per simulation week."""
     rows: list[dict[str, object]] = []
 
     for week in result.week_results:
         booking = week.booking
-
-        occupancy = (
-            booking.seats_filled / booking.total_sim_seats
-            if booking.total_sim_seats > 0
-            else 0.0
-        )
+        occupancy = booking.seats_filled / booking.total_sim_seats if booking.total_sim_seats > 0 else 0.0
 
         rows.append(
             {
@@ -230,7 +211,6 @@ def build_pair_history_frame(
     state: NetworkState,
     tracker: PairWeekTracker,
 ) -> pd.DataFrame:
-    """Create the complete pair-level co-attendance history table."""
     active_social = social_tie_pairs(state)
     rows: list[dict[str, object]] = []
 
@@ -268,10 +248,7 @@ def build_pair_history_frame(
     )
 
 
-def _degree_map(
-    pairs: set[tuple[str, str]],
-) -> dict[str, int]:
-    """Calculate node degree from an undirected pair set."""
+def _degree_map(pairs: set[tuple[str, str]]) -> dict[str, int]:
     degree: dict[str, int] = {}
 
     for rider_1, rider_2 in pairs:
@@ -286,13 +263,8 @@ def build_node_attributes_frame(
     result: SimulationResult,
     coordination_counts: Mapping[str, int] | None = None,
 ) -> pd.DataFrame:
-    """Create rider-level attributes and final network-degree measures."""
-    familiarity = familiarity_pairs(
-        result.network_state
-    )
-    social = social_tie_pairs(
-        result.network_state
-    )
+    familiarity = familiarity_pairs(result.network_state)
+    social = social_tie_pairs(result.network_state)
 
     familiarity_degree = _degree_map(familiarity)
     social_degree = _degree_map(social)
@@ -347,7 +319,6 @@ def build_edge_list_frame(
     state: NetworkState,
     layer: str,
 ) -> pd.DataFrame:
-    """Create a familiarity or active-social edge list."""
     if layer == "familiarity":
         pairs = familiarity_pairs(state)
     elif layer == "social":
@@ -387,7 +358,6 @@ def build_edge_list_frame(
 def coordination_counts_from_result(
     result: SimulationResult,
 ) -> dict[str, int]:
-    """Count coordinated bookings completed by each rider."""
     counts: dict[str, int] = {}
 
     for week in result.week_results:
@@ -412,16 +382,8 @@ def export_seed_outputs(
     summary: Mapping[str, object],
     longitudinal: pd.DataFrame,
 ) -> Path:
-    """Write the complete analysis export bundle for one seed."""
-    root = (
-        Path(output_dir)
-        / scenario
-        / f"seed_{seed}"
-    )
-    root.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
+    root = Path(output_dir) / scenario / ("seed_" + str(seed))
+    root.mkdir(parents=True, exist_ok=True)
 
     summary_row = dict(summary)
     summary_row["scenario"] = scenario

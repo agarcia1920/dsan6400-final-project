@@ -1,4 +1,4 @@
-# Setting coordination partners among riders with social ties.
+# Chooses which social-tie partners attempt to ride together during a week.
 
 from dataclasses import dataclass
 import numpy as np

@@ -1,4 +1,4 @@
-"""Instructors, assignment, and baseline schedules."""
+# Instructor roster, baseline class assignment, and weekly on/off availability.
 
 from __future__ import annotations
 

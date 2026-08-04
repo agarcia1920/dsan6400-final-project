@@ -1,4 +1,4 @@
-"""Post-simulation network analysis."""
+# Short import paths for metrics, plots, and models from the notebooks.
 
 from soulcycle_network.analysis.metrics import (
     NetworkSummary,

@@ -1,4 +1,4 @@
-"""Simulation reproducibility and export smoke tests."""
+# Fixed seeds should repeat, and a full experiment seed should write the expected CSV files.
 
 from soulcycle_network.experiment_runner import SCENARIOS, run_experiment_seed
 from soulcycle_network.simulation import init_simulation, run_simulation, summarize_simulation
@@ -35,6 +35,19 @@ def test_fixed_seed_reproducible(studios_csv_path, active_instructors_csv_path, 
         return len(result.network_state.co_counts)
 
     assert run_once(6400) == run_once(6400)
+
+
+def test_activity_frequency_tertiles():
+    import pandas as pd
+
+    from soulcycle_network.analysis.metrics import assign_activity_frequency_tier
+
+    nodes = pd.DataFrame(
+        {"rider_id": [f"R{i:04d}" for i in range(9)], "baseline_annual_ride_rate": list(range(1, 10))}
+    )
+    tiered = assign_activity_frequency_tier(nodes)
+    assert tiered["activity_frequency_tier"].nunique() == 3
+    assert "activity_tertile_q33" in tiered.columns
 
 
 def test_experiment_seed_exports(tmp_path, studios_csv_path):

@@ -1,4 +1,4 @@
-"""Shared path setup for analysis notebooks."""
+# Locates the project root when a notebook runs from analysis/ and adds src/ to sys.path.
 
 from pathlib import Path
 import sys

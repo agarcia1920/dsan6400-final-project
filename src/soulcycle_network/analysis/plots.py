@@ -1,3 +1,5 @@
+# Degree distributions and log-log CCDF figures used in the analysis notebooks.
+
 from __future__ import annotations
 
 import matplotlib.pyplot as plt

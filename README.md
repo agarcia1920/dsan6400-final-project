@@ -40,6 +40,8 @@ Simulation outputs under `outputs/` are treated as the analytical dataset. Longi
 
 Operational parameters match `src/soulcycle_network/config.py` and the frozen tag `v1.0-calibrated`. Exported CSVs are assumed to come from the same config. Graph summaries distinguish **population-wide** metrics (all 10k nodes when isolates are included) from **edge-induced / GCC** metrics where noted in the notebooks.
 
+Longitudinal metrics (rebuilt via `run_analysis.py --task longitudinal`) add **activity-tier assortativity**, **mean degree by tier**, co-attendance→social **dyad counts** at weeks 13/26/52, and **latent analog connection** counts on familiarity rows. `rider_nodes.csv` includes an `activity_frequency_tier` column (baseline annual rate tertiles). These are structural association measures, not causal social influence or platform recommendations.
+
 ## Repository structure
 
 ```text

@@ -1,4 +1,4 @@
-# Track co-attendance, tie strength, and tie decay.
+# Co-attendance counts, tie strength, decay, and familiar vs social pair definitions.
 
 from dataclasses import dataclass, field
 import networkx as nx

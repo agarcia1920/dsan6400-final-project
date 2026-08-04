@@ -1,3 +1,5 @@
+# Shared pytest data paths, fixed RNG, Faker, and a small studio/instructor setup for tests.
+
 from pathlib import Path
 
 import pytest

@@ -1,4 +1,4 @@
-# Multi-seed calibration helpers for analysis notebooks and scripts.
+# Several short runs on different seeds; output rows land in calibration.csv.
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Studios, slots, and schedules."""
+# Studios, recurring class slots, and scaled seat capacity for each session.
 
 from __future__ import annotations
 # Studio objects for the SoulCycle network simulation.

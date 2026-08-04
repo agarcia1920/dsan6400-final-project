@@ -1,11 +1,17 @@
-from __future__ import annotations
+# Loads exported seed folders and rebuilds longitudinal metrics from attendance.csv when needed.
 
+from __future__ import annotations
 from pathlib import Path
 
 import networkx as nx
 import pandas as pd
 
-from soulcycle_network.analysis.metrics import ANALYSIS_SNAPSHOT_WEEKS, build_rider_graph, snapshot_metrics_rows
+from soulcycle_network.analysis.metrics import (
+    ANALYSIS_SNAPSHOT_WEEKS,
+    assign_activity_frequency_tier,
+    build_rider_graph,
+    snapshot_metrics_rows,
+)
 from soulcycle_network.analysis.models import coattendance_from_attendance
 from soulcycle_network.network_formation import decay_ties, empty_network
 
@@ -45,6 +51,9 @@ def rider_nodes_from_exports(seed_dir: str | Path) -> pd.DataFrame:
     for old, new in rename.items():
         if old in nodes.columns and new not in nodes.columns:
             nodes = nodes.rename(columns={old: new})
+    if "baseline_annual_ride_rate" in nodes.columns or "annual_ride_rate" in nodes.columns:
+        tiered = assign_activity_frequency_tier(nodes)
+        nodes["activity_frequency_tier"] = tiered["activity_frequency_tier"]
     return nodes
 
 
@@ -58,7 +67,7 @@ def familiarity_graph_from_seed(seed_dir: str | Path, include_isolates: bool = T
 def load_master_table(output_dir: str | Path) -> pd.DataFrame:
     path = Path(output_dir) / "longitudinal_metrics_master.csv"
     if not path.exists():
-        raise FileNotFoundError(f"Missing {path}. Run scripts/run_experiment.py first.")
+        raise FileNotFoundError("Missing " + str(path) + ". Run scripts/run_experiment.py first.")
     return normalize_longitudinal_columns(pd.read_csv(path))
 
 
@@ -67,7 +76,6 @@ def load_project_master(output_dir: str | Path) -> pd.DataFrame:
 
 
 def normalize_longitudinal_columns(frame: pd.DataFrame) -> pd.DataFrame:
-    """Old export column names → what the notebooks expect."""
     out = frame.copy()
     if "gcc_nodes" not in out.columns and "largest_component" in out.columns:
         out["gcc_nodes"] = out["largest_component"]
@@ -89,12 +97,15 @@ def rebuild_longitudinal_from_attendance(
     n_weeks: int | None = None,
     checkpoint_weeks: tuple[int, ...] = ANALYSIS_SNAPSHOT_WEEKS,
 ) -> pd.DataFrame:
-    """Replay decay + co-attendance from attendance.csv (no full re-sim)."""
     if attendance.empty:
         return pd.DataFrame()
 
     cluster = node_attributes.set_index("rider_id")["home_cluster"].astype(str).to_dict()
     market = node_attributes.set_index("rider_id")["home_market"].astype(str).to_dict()
+    tiered = assign_activity_frequency_tier(node_attributes)
+    rate_col = "baseline_annual_ride_rate" if "baseline_annual_ride_rate" in tiered.columns else "annual_ride_rate"
+    tier_map = tiered.set_index("rider_id")["activity_frequency_tier"].astype(str).to_dict()
+    baseline_rates = tiered.set_index("rider_id")[rate_col].astype(float).to_dict()
     max_week = int(attendance["week_number"].max()) if n_weeks is None else n_weeks
 
     state = empty_network()
@@ -120,6 +131,9 @@ def rebuild_longitudinal_from_attendance(
                     week=week,
                     rider_cluster=cluster,
                     rider_market=market,
+                    tier_map=tier_map,
+                    baseline_rates=baseline_rates,
+                    attendance=attendance,
                 )
             )
 

@@ -1,5 +1,5 @@
-# This file contains the configuration for the SoulCycle network.
-# It stores parameters that may be reused across the company-environment, rider-behavior, and network-formation modules. 
+# Global simulation parameters for time, riders, tie rules, and coordination limits.
+# Parameters here are reused across the company environment, rider behavior, and network formation modules. 
 
 # Random seed to ensure reproducibility
 RANDOM_SEED=6400

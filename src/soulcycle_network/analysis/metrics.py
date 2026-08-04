@@ -1,3 +1,5 @@
+# Graph summaries and longitudinal checkpoint metrics from network state or replayed attendance.
+
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
@@ -13,12 +15,16 @@ from soulcycle_network.config import (
     MIN_CLASSES_FOR_FAMILIARITY,
     MIN_CLASSES_FOR_SOCIAL_TIE,
 )
-from soulcycle_network.network_formation import NetworkState, social_tie_pairs, to_graph
+from soulcycle_network.network_formation import (
+    NetworkState,
+    familiarity_pairs,
+    social_tie_pairs,
+    to_graph,
+)
 
 ANALYSIS_SNAPSHOT_WEEKS: tuple[int, ...] = (1, 4, 8, 13, 26, 39, 52)
-
-
-# --- Graph construction ---
+LINKING_STAGE_WEEKS: tuple[int, ...] = (13, 26, 52)
+ACTIVITY_TIER_LABELS = ("low_frequency", "moderate_frequency", "high_frequency")
 
 
 def isolate_gcc(graph: nx.Graph) -> nx.Graph:
@@ -77,6 +83,120 @@ def categorical_assortativity(
     if labeled.number_of_edges() == 0:
         return None
     return float(nx.attribute_assortativity_coefficient(labeled, attribute_column))
+
+
+def _baseline_rate_column(nodes: pd.DataFrame) -> str:
+    if "baseline_annual_ride_rate" in nodes.columns:
+        return "baseline_annual_ride_rate"
+    if "annual_ride_rate" in nodes.columns:
+        return "annual_ride_rate"
+    raise ValueError("node table needs baseline_annual_ride_rate or annual_ride_rate.")
+
+
+def assign_activity_frequency_tier(nodes: pd.DataFrame) -> pd.DataFrame:
+    rate_col = _baseline_rate_column(nodes)
+    rates = nodes[rate_col].astype(float)
+    q33, q67 = float(rates.quantile(1 / 3)), float(rates.quantile(2 / 3))
+
+    def tier(value: float) -> str:
+        if value <= q33:
+            return ACTIVITY_TIER_LABELS[0]
+        if value <= q67:
+            return ACTIVITY_TIER_LABELS[1]
+        return ACTIVITY_TIER_LABELS[2]
+
+    out = nodes.copy()
+    out["activity_frequency_tier"] = rates.map(tier)
+    out["activity_tertile_q33"] = q33
+    out["activity_tertile_q67"] = q67
+    return out
+
+
+def _mean_abs_rate_diff_on_edges(graph: nx.Graph, rates: dict[str, float]) -> float | None:
+    if graph.number_of_edges() == 0:
+        return None
+    diffs = [abs(rates.get(a, np.nan) - rates.get(b, np.nan)) for a, b in graph.edges()]
+    diffs = [d for d in diffs if np.isfinite(d)]
+    return float(np.mean(diffs)) if diffs else None
+
+
+def _mean_degree_by_activity_tier(graph: nx.Graph, tier_map: dict[str, str]) -> dict[str, float | None]:
+    out: dict[str, float | None] = {}
+    for label in ACTIVITY_TIER_LABELS:
+        riders = [r for r, t in tier_map.items() if t == label and r in graph]
+        if not riders:
+            out["mean_degree_" + label] = None
+            continue
+        out["mean_degree_" + label] = float(sum(graph.degree(r) for r in riders) / len(riders))
+    return out
+
+
+def _coordinated_social_dyads(
+    attendance: pd.DataFrame,
+    state: NetworkState,
+    through_week: int,
+) -> int:
+    att = attendance[attendance["week_number"] <= through_week]
+    if att.empty:
+        return 0
+    coord = att[att["coordinated_booking"].astype(str).str.lower().isin({"true", "1", "yes"})]
+    if coord.empty:
+        return 0
+    social = social_tie_pairs(state)
+    count = 0
+    for _, session_df in coord.groupby(["week_number", "session_id"], sort=False):
+        riders = session_df["rider_id"].astype(str).tolist()
+        for i in range(len(riders)):
+            for j in range(i + 1, len(riders)):
+                key = tuple(sorted((riders[i], riders[j])))
+                if key in social:
+                    count += 1
+    return count
+
+
+def dyad_linking_and_latent_counts(
+    state: NetworkState,
+    *,
+    attendance: pd.DataFrame | None,
+    through_week: int,
+    rider_cluster: dict[str, str] | None = None,
+) -> dict[str, int | float | None]:
+    pairs = list(state.co_counts.items())
+    n_co = sum(1 for _, c in pairs if c >= 1)
+    social = social_tie_pairs(state)
+    familiar = familiarity_pairs(state)
+    share = (lambda n: float(n / n_co) if n_co else None)
+
+    n_familiar = sum(1 for _, c in pairs if c >= MIN_CLASSES_FOR_FAMILIARITY)
+    n_social = len(social)
+    n_coord = _coordinated_social_dyads(attendance, state, through_week) if attendance is not None else None
+
+    one_from_familiar = sum(1 for _, c in pairs if c == 2)
+    one_from_social = sum(1 for key, c in pairs if c == MIN_CLASSES_FOR_SOCIAL_TIE - 1 and key not in social) + sum(
+        1 for key, c in pairs if c == 5 and key not in social
+    )
+    repeated_not_social = sum(1 for key, c in pairs if c >= 2 and key not in social)
+    riders_co = {r for pair in state.co_counts for r in pair}
+    riders_social = {r for pair in social for r in pair}
+    cross_cluster_familiar = sum(
+        1 for a, b in familiar if rider_cluster and rider_cluster.get(a) != rider_cluster.get(b)
+    )
+
+    return {
+        "coattending_dyads": n_co,
+        "dyads_exactly_two_shared_classes": sum(1 for _, c in pairs if c == 2),
+        "familiar_dyads": n_familiar,
+        "near_social_dyads_four_or_five": sum(1 for _, c in pairs if c in (4, 5)),
+        "active_social_dyads": n_social,
+        "social_dyads_with_coordinated_class": n_coord,
+        "share_familiar_of_coattending": share(n_familiar),
+        "share_social_of_coattending": share(n_social),
+        "latent_pairs_one_encounter_from_familiarity": one_from_familiar,
+        "latent_familiar_one_encounter_from_social": one_from_social,
+        "latent_repeated_co_not_social_dyads": repeated_not_social,
+        "latent_riders_with_co_but_no_social_tie": len(riders_co - riders_social),
+        "latent_cross_cluster_familiarity_ties": cross_cluster_familiar,
+    }
 
 
 def edge_share_by_attribute(
@@ -172,7 +292,6 @@ def _finite_or_none(value: float) -> float | None:
 
 
 def summarize_graph(graph: nx.Graph) -> dict[str, int | float | None]:
-    """Course-style summary: full graph + GCC path metrics."""
     if graph.is_directed():
         raise TypeError("This summary currently expects an undirected graph.")
 
@@ -185,11 +304,7 @@ def summarize_graph(graph: nx.Graph) -> dict[str, int | float | None]:
     average_degree = (2 * m / n) if n > 0 else 0.0
     edge_nodes = [node for node, deg in graph.degree() if deg > 0]
     subgraph = graph.subgraph(edge_nodes).copy() if edge_nodes else graph.copy()
-    mean_degree_connected = (
-        (2 * subgraph.number_of_edges() / subgraph.number_of_nodes())
-        if subgraph.number_of_nodes() > 0
-        else 0.0
-    )
+    mean_degree_connected = (2 * subgraph.number_of_edges() / subgraph.number_of_nodes()) if subgraph.number_of_nodes() > 0 else 0.0
 
     clustering = nx.average_clustering(graph) if n > 0 else 0.0
     transitivity = nx.transitivity(graph) if n > 0 else 0.0
@@ -236,9 +351,6 @@ def summarize_graph(graph: nx.Graph) -> dict[str, int | float | None]:
         gcc_transitivity=gcc_transitivity,
     )
     return asdict(summary)
-
-
-# --- Layer graphs (used during simulation export and null comparisons) ---
 
 
 @dataclass(frozen=True)
@@ -345,16 +457,20 @@ def snapshot_metrics_rows(
     week: int,
     rider_cluster: dict[str, str],
     rider_market: dict[str, str],
+    tier_map: dict[str, str] | None = None,
+    baseline_rates: dict[str, float] | None = None,
+    attendance: pd.DataFrame | None = None,
 ) -> list[dict[str, object]]:
-    import pandas as pd
-
     node_attributes = pd.DataFrame(
-        {
-            "rider_id": list(rider_cluster.keys()),
-            "home_cluster": list(rider_cluster.values()),
-            "home_market": [rider_market[rid] for rid in rider_cluster],
-        }
+        {"rider_id": list(rider_cluster.keys()), "home_cluster": list(rider_cluster.values()), "home_market": [rider_market[rid] for rid in rider_cluster]}
     )
+    if tier_map:
+        node_attributes["activity_frequency_tier"] = node_attributes["rider_id"].map(tier_map)
+
+    linking: dict[str, int | float | None] = {}
+    if week in LINKING_STAGE_WEEKS:
+        linking = dyad_linking_and_latent_counts(state, attendance=attendance, through_week=week, rider_cluster=rider_cluster)
+
     rows: list[dict[str, object]] = []
     for network_type, layer in (("familiarity", FAMILIARITY_LAYER), ("social", SOCIAL_LAYER)):
         graph = build_layer_graph(state, layer)
@@ -367,13 +483,18 @@ def snapshot_metrics_rows(
             **metrics,
         }
         if graph.number_of_edges() > 0:
-            row["market_assortativity"] = categorical_assortativity(
-                graph, node_attributes, attribute_column="home_market"
-            )
-            row["cluster_assortativity"] = categorical_assortativity(
-                graph, node_attributes, attribute_column="home_cluster"
-            )
+            row["market_assortativity"] = categorical_assortativity(graph, node_attributes, attribute_column="home_market")
+            row["cluster_assortativity"] = categorical_assortativity(graph, node_attributes, attribute_column="home_cluster")
             shares = edge_share_by_attribute(graph, node_attributes, attribute_column="home_cluster")
             row["same_cluster_edge_share"] = shares["same_attribute_edge_share"]
+            if tier_map is not None:
+                row["activity_tier_assortativity"] = categorical_assortativity(
+                    graph, node_attributes, attribute_column="activity_frequency_tier"
+                )
+                if baseline_rates:
+                    row["mean_abs_baseline_rate_diff_on_edges"] = _mean_abs_rate_diff_on_edges(graph, baseline_rates)
+                row.update(_mean_degree_by_activity_tier(graph, tier_map))
+        if network_type == "familiarity" and linking:
+            row.update(linking)
         rows.append(row)
     return rows

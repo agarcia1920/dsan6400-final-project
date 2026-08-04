@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Calibration, longitudinal rebuild, nulls, comparisons, and compact results."""
+# Rebuilds analysis tables from simulation outputs and copies compact files into results/.
 
 from __future__ import annotations
 
@@ -146,17 +146,17 @@ def task_comparisons(seed_dir: Path, output: Path, seed: int, n_replicates: int)
             ("erdos_renyi", "matched_m", matched_random_graph(n=n, m=m, seed=rep_seed)),
             (
                 "preferential_attachment",
-                f"alpha=1.0;m_links={m_links}",
+                "alpha=1.0;m_links=" + str(m_links),
                 nonlinear_preferential_attachment(n=n, m_links=m_links, alpha=1.0, seed=rep_seed + 10_000),
             ),
             (
                 "attractiveness",
-                f"A=1.0;m_links={m_links}",
+                "A=1.0;m_links=" + str(m_links),
                 attractiveness_model(n=n, m_links=m_links, attractiveness=1.0, seed=rep_seed + 20_000),
             ),
             (
                 "fitness",
-                f"uniform;m_links={m_links}",
+                "uniform;m_links=" + str(m_links),
                 fitness_model(n=n, m_links=m_links, seed=rep_seed + 30_000)[0],
             ),
         ):
@@ -170,14 +170,14 @@ def task_results(outputs: Path, results_dir: Path, scenario: str, seed: int) -> 
     results_dir.mkdir(parents=True, exist_ok=True)
     master = outputs / "longitudinal_metrics_master.csv"
     if not master.is_file():
-        raise FileNotFoundError(f"Missing {master}; run --task longitudinal first.")
+        raise FileNotFoundError("Missing " + str(master) + "; run --task longitudinal first.")
     shutil.copy2(master, results_dir / "longitudinal_metrics.csv")
     cal = results_dir / "calibration.csv"
     if not cal.is_file():
         alt = outputs / "calibration_by_seed.csv"
         if alt.is_file():
             shutil.copy2(alt, cal)
-    seed_dir = outputs / scenario / f"seed_{seed}"
+    seed_dir = outputs / scenario / ("seed_" + str(seed))
     if not seed_dir.is_dir():
         raise FileNotFoundError(seed_dir)
     rider_nodes_from_exports(seed_dir).to_csv(results_dir / "rider_nodes.csv", index=False)

@@ -1,5 +1,5 @@
-# Run the full 52-week rider attendance and network simulation.
-#importing the necessary libraries and modules
+# One simulation path: initialize context, advance week by week, return summary totals.
+
 from dataclasses import dataclass, field
 from pathlib import Path
 import numpy as np

@@ -1,4 +1,4 @@
-"""Null models, canonical graph generators, and scenario comparison helpers."""
+# Attendance shuffles for null models and random graph generators for degree comparisons.
 
 from __future__ import annotations
 
@@ -13,11 +13,7 @@ from soulcycle_network.network_formation import NetworkState
 from soulcycle_network.simulation import SimulationContext, SimulationResult
 
 
-# --- Attendance shuffles ---
-
-
 def null_shuffle_attendance_df(attendance: pd.DataFrame, rng: np.random.Generator) -> pd.DataFrame:
-    """Shuffle session IDs within each (week, day). Keeps one class per rider per day."""
     if attendance.empty:
         return attendance.copy()
 
@@ -36,7 +32,6 @@ def null_shuffle_attendance_df(attendance: pd.DataFrame, rng: np.random.Generato
 
 
 def null_shuffle_attendance_market_df(attendance: pd.DataFrame, rng: np.random.Generator) -> pd.DataFrame:
-    """Same as global shuffle, but separately within each home market."""
     if attendance.empty:
         return attendance.copy()
     if "home_market" not in attendance.columns:
@@ -154,9 +149,6 @@ def null_degree_preserving_rewire(
     return rewired
 
 
-# --- Canonical comparison graphs ---
-
-
 def matched_random_graph(*, n: int, m: int, seed: int) -> nx.Graph:
     probability = (2 * m / (n * (n - 1))) if n > 1 else 0.0
     return nx.gnp_random_graph(n=n, p=probability, seed=seed)
@@ -236,7 +228,6 @@ def degree_ks_distance(graph_a: nx.Graph, graph_b: nx.Graph) -> float:
 
 
 def paired_scenario_comparison(results: pd.DataFrame, *, metric: str, value_col: str = "edges") -> pd.DataFrame:
-    """Paired deltas across coordination scenarios (same seed)."""
     if "metric" in results.columns and "value" in results.columns:
         metric_df = results.loc[results["metric"] == metric, ["seed", "scenario", "value"]]
     else:

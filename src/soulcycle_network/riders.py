@@ -1,8 +1,6 @@
-"""Riders, parameters, and generation."""
+# Synthetic riders, attendance propensity draws, and booking preferences.
 
 from __future__ import annotations
-# Rider objects for the SoulCycle network simulation.
-
 from dataclasses import dataclass, field
 
 import numpy as np

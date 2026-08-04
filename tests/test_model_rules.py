@@ -1,4 +1,4 @@
-"""Studios, riders, booking rules, and network-formation thresholds."""
+# Covers studios, booking limits, tie thresholds, and basic graph construction rules.
 
 import networkx as nx
 

@@ -1,4 +1,4 @@
-"""Weekly sessions, schedules, and booking."""
+# Weekly schedules, rider booking into sessions, and enrollments passed to tie updates.
 
 from __future__ import annotations
 
@@ -64,7 +64,7 @@ class AttendanceRecord:
         if self.daily_slot_index <= 0:
             raise ValueError("daily_slot_index must be positive.")
 
-# generate a unique key for a session
+# Generate a unique key for a session.
 def session_key(week_number: int, slot_id: str) -> str:
     # validate input types
     if isinstance(week_number, bool) or not isinstance(week_number, int):
