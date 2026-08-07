@@ -57,6 +57,7 @@ tests/         conftest + test_model_rules + test_pipeline
 ## Commands
 
 ```bash
+pip install -r requirements.txt
 pytest
 python scripts/run_simulation.py --seed 6400 --scenario baseline
 python scripts/run_experiment.py
